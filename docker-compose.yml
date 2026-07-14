@@ -8,7 +8,7 @@ services:
       - ${APP_LOGS_DIR:-./logs}:/app/logs:z
       # Cookbook remote-server SSH identity. Odysseus can generate a key here;
       # add the shown public key to each remote server's authorized_keys.
-      - ${APP_DATA_DIR:-./data}/ssh:/app/.ssh:z
+      - ./data/ssh:/app/.ssh:z
       # Cookbook local model cache. Inside Docker, "Local" means the Odysseus
       # container, so persist its HuggingFace cache under ./data/huggingface.
       - ${APP_DATA_DIR:-./data}/huggingface:/app/.cache/huggingface:z
