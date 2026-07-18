@@ -160,19 +160,19 @@ function hslToHex(h, s, l) {
 function deriveSyntaxColors(colors) {
   const [fgH, fgS, fgL] = hexToHSL(colors.fg);
   const [bgH, bgS, bgL] = hexToHSL(colors.bg);
-  const [redH, redS, redL] = hexToHSL(colors.red || '#e06c75');
+  const [redH, redS, redL] = hexToHSL(colors.red || '#d4a858');
   const isDark = bgL < 50;
   const codeBgL = isDark ? Math.max(bgL - 4, 0) : Math.min(bgL + 4, 100);
   return {
     bg: hslToHex(bgH, bgS, codeBgL),
     fg: colors.fg,
-    keyword: hslToHex((redH + 280) % 360, Math.min(redS + 10, 80), isDark ? 70 : 45),
+    keyword: hslToHex(redH, Math.min(redS + 10, 80), isDark ? 70 : 45),
     string: hslToHex(40, Math.min(fgS + 20, 70), isDark ? 72 : 42),
     comment: hslToHex(fgH, Math.max(fgS - 20, 5), isDark ? (fgL * 0.5 + bgL * 0.5) : (fgL * 0.5 + bgL * 0.5)),
     function: hslToHex(210, Math.min(fgS + 20, 75), isDark ? 70 : 45),
     // Extra token colors for richer highlighting
     number: hslToHex(20, Math.min(fgS + 15, 65), isDark ? 68 : 48),
-    builtin: hslToHex(180, Math.min(fgS + 15, 60), isDark ? 65 : 40),
+    builtin: hslToHex(330, Math.min(fgS + 15, 60), isDark ? 65 : 40),
     variable: hslToHex((fgH + 30) % 360, Math.min(fgS + 5, 60), isDark ? fgL : fgL),
     params: hslToHex(fgH, Math.max(fgS - 5, 10), isDark ? Math.min(fgL + 8, 85) : Math.max(fgL - 8, 25)),
   };
@@ -198,7 +198,7 @@ const ADV_KEYS = [
 
 function computeAdvancedDefaults(colors) {
   const syn = deriveSyntaxColors(colors);
-  const red = colors.red || '#e06c75';
+  const red = colors.red || '#d4a858';
   return {
     userBubbleBg: colors.bg,
     aiBubbleBg: colors.panel,
@@ -288,7 +288,7 @@ export function applyColors(colors) {
   }
 
   // Update favicon to match theme accent color
-  _updateFavicon(colors.red || '#e06c75');
+  _updateFavicon(colors.red || '#d4a858');
 }
 
 // Per-route SVG shape registry — kept in sync with the inline favicon
@@ -1216,7 +1216,7 @@ export function initThemeUI() {
   // Keep the hex display chip in sync with whatever the picker reports.
   const _harmonyHex = document.getElementById('harmony-accent-hex');
   if (harmonyAccentEl && _harmonyHex) {
-    _harmonyHex.textContent = harmonyAccentEl.value || '#e06c75';
+    _harmonyHex.textContent = harmonyAccentEl.value || '#d4a858';
     harmonyAccentEl.addEventListener('input', () => {
       _harmonyHex.textContent = harmonyAccentEl.value;
     });

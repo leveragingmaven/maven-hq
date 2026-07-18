@@ -19,6 +19,17 @@
   (function(){
     try {
       var t = JSON.parse(localStorage.getItem('odysseus-theme'));
+      // MAVEN HQ BRANDING — migrate legacy default-dark theme to Maven palette
+      // so existing users (with the old purple/teal dark theme saved in
+      // localStorage) get the Maven gold/pink palette, not just new users.
+      // Only migrates the pristine default-dark theme; custom themes untouched.
+      if (t && t.colors && (!t.name || t.name === 'dark') && t.colors.red === '#e06c75' && t.colors.fg === '#9cdef2' && t.colors.border === '#355a66') {
+        t.colors.red = '#d4a858';
+        t.colors.fg = '#f0a8c0';
+        t.colors.border = '#6a4555';
+        try { localStorage.setItem('odysseus-theme', JSON.stringify(t)); } catch(e){}
+      }
+      // END MAVEN HQ BRANDING
       if (t && t.colors) {
         var s = document.documentElement.style;
         var c = t.colors;
@@ -52,16 +63,16 @@
           function th(v){return Math.round(v*255).toString(16).padStart(2,'0')}
           return'#'+th(f(0))+th(f(8))+th(f(4));
         }
-        var fH=h2hsl(c.fg),bH=h2hsl(c.bg),rH=h2hsl(c.red||'#e06c75');
+        var fH=h2hsl(c.fg),bH=h2hsl(c.bg),rH=h2hsl(c.red||'#d4a858');
         var dk=bH[2]<50;
         s.setProperty('--hl-bg', hsl2h(bH[0],bH[1],dk?Math.max(bH[2]-4,0):Math.min(bH[2]+4,100)));
         s.setProperty('--hl-fg', c.fg);
-        s.setProperty('--hl-keyword', hsl2h((rH[0]+280)%360,Math.min(rH[1]+10,80),dk?70:45));
+        s.setProperty('--hl-keyword', hsl2h(rH[0],Math.min(rH[1]+10,80),dk?70:45));
         s.setProperty('--hl-string', hsl2h(40,Math.min(fH[1]+20,70),dk?72:42));
         s.setProperty('--hl-comment', hsl2h(fH[0],Math.max(fH[1]-20,5),(fH[2]*0.5+bH[2]*0.5)));
         s.setProperty('--hl-function', hsl2h(210,Math.min(fH[1]+20,75),dk?70:45));
         s.setProperty('--hl-number', hsl2h(20,Math.min(fH[1]+15,65),dk?68:48));
-        s.setProperty('--hl-builtin', hsl2h(180,Math.min(fH[1]+15,60),dk?65:40));
+        s.setProperty('--hl-builtin', hsl2h(330,Math.min(fH[1]+15,60),dk?65:40));
         s.setProperty('--hl-variable', hsl2h((fH[0]+30)%360,Math.min(fH[1]+5,60),fH[2]));
         s.setProperty('--hl-params', hsl2h(fH[0],Math.max(fH[1]-5,10),dk?Math.min(fH[2]+8,85):Math.max(fH[2]-8,25)));
         // Apply advanced overrides if present
@@ -104,7 +115,7 @@
     try {
       var path = (window.location.pathname || '').toLowerCase();
       var theme = (function(){ try { return JSON.parse(localStorage.getItem('odysseus-theme')); } catch(_) { return null; } })();
-      var ac = (theme && (theme.red || theme.colors && theme.colors.red)) || '#e06c75';
+      var ac = (theme && (theme.red || theme.colors && theme.colors.red)) || '#d4a858';
       // Shapes are line-stroke SVGs (no emoji glyphs). Each entry returns
       // the inner SVG markup rendered against currentColor=`ac`.
       var SHAPES = {
@@ -230,7 +241,7 @@
 <body>
   <!-- Loading overlay — hides all flashing until app is ready -->
   <div id="app-loader" style="position:fixed;inset:0;z-index:99999;background:var(--bg,#282c34);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;transition:opacity .3s">
-    <div id="loader-wave" style="color:var(--brand-color,var(--red,#e06c75));font-family:monospace;font-size:11px;opacity:.5">▁▂▃</div>
+    <div id="loader-wave" style="color:var(--brand-color,var(--red,#d4a858));font-family:monospace;font-size:11px;opacity:.5">▁▂▃</div>
   </div>
   <script nonce="{{CSP_NONCE}}">
   (function(){
@@ -550,8 +561,8 @@
           <div class="theme-fd-group">
             <label class="theme-fd-label">Accent Color</label>
             <div class="color-row" style="justify-content:flex-start;gap:8px;">
-              <input type="color" id="harmony-accent" value="#e06c75">
-              <span id="harmony-accent-hex" style="font-size:11px;opacity:0.65;font-family:ui-monospace,monospace;letter-spacing:0.02em;">#e06c75</span>
+              <input type="color" id="harmony-accent" value="#d4a858">
+              <span id="harmony-accent-hex" style="font-size:11px;opacity:0.65;font-family:ui-monospace,monospace;letter-spacing:0.02em;">#d4a858</span>
             </div>
           </div>
           <div class="theme-fd-group">

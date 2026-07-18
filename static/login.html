@@ -25,6 +25,16 @@
   var THEME_DEFAULT_INTENSITY = { midnight:0.5, terminal:0.8, organs:0.65 };
   try {
     var t = JSON.parse(localStorage.getItem('odysseus-theme'));
+    // MAVEN HQ BRANDING — migrate legacy default-dark theme to Maven palette
+    // (mirrors index.html) so the login page picks up Maven gold/pink for
+    // existing users with the old default-dark theme saved.
+    if (t && t.colors && (!t.name || t.name === 'dark') && t.colors.red === '#e06c75' && t.colors.fg === '#9cdef2' && t.colors.border === '#355a66') {
+      t.colors.red = '#d4a858';
+      t.colors.fg = '#f0a8c0';
+      t.colors.border = '#6a4555';
+      try { localStorage.setItem('odysseus-theme', JSON.stringify(t)); } catch(e){}
+    }
+    // END MAVEN HQ BRANDING
     var s = document.documentElement.style;
     if (t && t.colors) {
       var c = t.colors;
@@ -93,8 +103,8 @@
      localStorage — renders the login page in the same palette as the rest
      of the app instead of a different greys+offwhite scheme. */
   :root {
-    --bg: #282c34; --fg: #9cdef2; --panel: #111; --border: #355a66;
-    --red: #e06c75; --green: #50fa7b;
+    --bg: #282c34; --fg: #f0a8c0; --panel: #111; --border: #6a4555;
+    --red: #d4a858; --green: #50fa7b;
     --bg-effect-intensity: 1;
   }
   /* Background patterns — mirrors static/style.css "Background Patterns"
