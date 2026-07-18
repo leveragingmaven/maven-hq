@@ -16,33 +16,33 @@
 :root {
   /* Core palette */
   --bg: #282c34;
-  --fg: #9cdef2;
+  --fg: #f0a8c0;
   --panel: #111;
-  --border: #355a66;
-  --red: #e06c75;
+  --border: #6a4555;
+  --red: #d4a858;
   --green: #50fa7b;
   --warn: #f0ad4e;
 
   /* Brand accent — single control point for the Maven HQ brand color.
-     Falls back to --red in component CSS. Overridable per-theme via
-     theme.js ADV_KEYS brandColor. */
+      Falls back to --red in component CSS. Overridable per-theme via
+      theme.js ADV_KEYS brandColor. */
   --brand-color: var(--red);
 
   /* Brand gradient endpoint — used where the brand accent transitions
-     into the foreground color (welcome title, login logo, etc.) */
+      into the foreground color (welcome title, login logo, etc.) */
   --brand-mix-to: var(--fg);
 
   /* Syntax highlighting */
   --hl-bg: #1e2228;
-  --hl-fg: #9cdef2;
-  --hl-keyword: #c678dd;
+  --hl-fg: #f0a8c0;
+  --hl-keyword: #d4a858;
   --hl-string: #e5c07b;
   --hl-comment: #828997;
   --hl-function: #61afef;
   --hl-number: #d19a66;
-  --hl-builtin: #56b6c2;
+  --hl-builtin: #e82070;
   --hl-variable: #abb2bf;
-  --hl-params: #a8c0d4;
+  --hl-params: #c8a8c0;
 
   /* Semantic colors */
   --color-error: #ff4444;
@@ -54,18 +54,18 @@
   --color-recording-hover: #d63031;
   --color-muted: #888;
   --color-muted-alt: #6b7280;
-  --color-accent: #00aaff;
+  --color-accent: #e82070;
   --color-agent-active: #00ff00;
   --color-brand-blue: #3b82f6;
   --color-blind-orange: #ff9800;
   --color-save-green: var(--color-success);
-  --color-link-hover: #66c7ff;
-  --color-subheader: #6b8a94;
+  --color-link-hover: #f04090;
+  --color-subheader: #c87090;
   --accent-warm: #d19a66;
 
   /* Font family — existing fonts kept as fallbacks.
-     To adopt a brand font, prepend it here (e.g.
-     'Brand Sans', 'Fira Code', monospace). */
+      To adopt a brand font, prepend it here (e.g.
+      'Brand Sans', 'Fira Code', monospace). */
   --font-family: 'Fira Code', monospace;
 }
 
@@ -78,12 +78,12 @@
   --border: #bbb;
   --hl-bg: #f9f9f9;
   --hl-fg: #2b2b2b;
-  --hl-keyword: #7928a1;
+  --hl-keyword: #b8860b;
   --hl-string: #986801;
   --hl-comment: #6a737d;
   --hl-function: #005cc5;
   --hl-number: #986801;
-  --hl-builtin: #0070a0;
+  --hl-builtin: #c71585;
   --hl-variable: #383a42;
   --hl-params: #4a4f5c;
 }
