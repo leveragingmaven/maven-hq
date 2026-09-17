@@ -396,6 +396,15 @@ class SkillsManager:
         if not files:
             raise SkillImportError("empty bundle")
         _rel, skill_md = pick_skill_md(files)
+        
+        # Maven Skills adapter: detect and transform Maven format to HQ format
+        try:
+            from .maven_skill_adapter import adapt_if_maven
+            skill_md, was_adapted = adapt_if_maven(skill_md, source_url, category_override=category if category != "imported" else None)
+        except Exception as e:
+            logger.warning(f"Maven adapter failed for {_rel}: {e}")
+            raise SkillImportError(f"Failed to adapt skill: {e}") from e
+        
         sk = Skill.from_markdown(skill_md)
         nm = slugify(sk.name or _rel.split("/")[-2] or "skill")
         cat = slugify(category or sk.category or "imported", fallback="imported")
