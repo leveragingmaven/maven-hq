@@ -1,4 +1,4 @@
-"""Import SKILL.md bundles from public GitHub (or skills.sh → GitHub) URLs."""
+"""Import SKILL.md bundles from GitHub (public or private with token) URLs."""
 from __future__ import annotations
 
 import logging
@@ -25,6 +25,11 @@ TEXT_NAMES = {"skill.md", "license", "license.md", "readme.md"}
 _GITHUB_HOSTS = frozenset({
     "github.com", "www.github.com", "api.github.com", "raw.githubusercontent.com",
 })
+
+# Optional GitHub token for private repository access.
+# Set GITHUB_TOKEN environment variable server-side.
+# Token is NEVER logged, exposed to frontend, or written to imported skills.
+_GITHUB_TOKEN: Optional[str] = os.environ.get("GITHUB_TOKEN")
 
 
 def _github_host(url: str) -> str:
@@ -141,7 +146,15 @@ def _api_contents_url(src: ResolvedSource, rel_path: str = "") -> str:
 
 
 def _github_response_error(response: httpx.Response) -> SkillImportError:
-    """Turn a failed GitHub HTTP response into a user-visible import error."""
+    """Turn a failed GitHub HTTP response into a user-visible import error.
+    
+    Distinguishes between:
+    - 404: Path genuinely does not exist
+    - 403: Private repository or rate limit (token may be needed)
+    - Other: Generic error
+    
+    Never leaks credentials or sensitive details.
+    """
     status = response.status_code
     detail = ""
     try:
@@ -157,6 +170,14 @@ def _github_response_error(response: httpx.Response) -> SkillImportError:
             "GitHub API rate limit exceeded — try again in a bit"
             + (f" ({detail})" if detail else "")
         )
+    if status == 403:
+        # Could be private repo without token, or insufficient permissions
+        # Do not reveal whether repo exists (security best practice)
+        return SkillImportError(
+            "GitHub repository or path is not accessible — "
+            "verify the URL is correct and the repository is public, "
+            "or configure GITHUB_TOKEN for private repository access"
+        )
     if status == 404:
         return SkillImportError("path not found on GitHub")
     if detail:
@@ -164,12 +185,20 @@ def _github_response_error(response: httpx.Response) -> SkillImportError:
     return SkillImportError(f"GitHub request failed ({status})")
 
 
+def _github_headers() -> Dict[str, str]:
+    """Return GitHub API headers, including Authorization if GITHUB_TOKEN is set."""
+    headers = {"Accept": "application/vnd.github+json"}
+    if _GITHUB_TOKEN:
+        headers["Authorization"] = f"Bearer {_GITHUB_TOKEN}"
+    return headers
+
+
 def _fetch_bytes(url: str) -> bytes:
     ok, reason = check_outbound_url(url)
     if not ok:
         raise SkillImportError(reason)
     with httpx.Client(follow_redirects=True, timeout=30.0) as client:
-        r = client.get(url, headers={"Accept": "application/vnd.github+json"})
+        r = client.get(url, headers=_github_headers())
         if r.status_code >= 400:
             raise _github_response_error(r)
         _assert_github_url(str(r.url), context="redirect target")
@@ -194,7 +223,7 @@ def _list_github_dir(src: ResolvedSource, rel_dir: str, out: Dict[str, str], *, 
     if not ok:
         raise SkillImportError(reason)
     with httpx.Client(follow_redirects=True, timeout=30.0) as client:
-        r = client.get(url, headers={"Accept": "application/vnd.github+json"})
+        r = client.get(url, headers=_github_headers())
         if r.status_code >= 400:
             raise _github_response_error(r)
         _assert_github_url(str(r.url), context="redirect target")

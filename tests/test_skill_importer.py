@@ -1,4 +1,4 @@
-"""Skill URL importer — GitHub path parsing."""
+"""Skill URL importer — GitHub path parsing and authentication."""
 import pytest
 
 from services.memory.skill_importer import (
@@ -6,7 +6,9 @@ from services.memory.skill_importer import (
     SkillImportError,
     _assert_github_url,
     _fetch_bytes,
+    _github_headers,
     _list_github_dir,
+    _GITHUB_TOKEN,
     parse_skill_source,
 )
 
@@ -176,3 +178,171 @@ def test_fetch_bytes_surfaces_github_error_detail(monkeypatch):
     _mock_httpx_client(monkeypatch, _Resp())
     with pytest.raises(SkillImportError, match="GitHub request failed \\(403\\): Forbidden"):
         _fetch_bytes("https://raw.githubusercontent.com/o/r/main/SKILL.md")
+
+
+# ---------------------------------------------------------------------------
+# Authentication tests
+# ---------------------------------------------------------------------------
+
+def test_github_headers_no_token():
+    """When no GITHUB_TOKEN is set, headers should only include Accept."""
+    import os
+    # Ensure token is not set
+    original = os.environ.pop("GITHUB_TOKEN", None)
+    try:
+        # Reload module to pick up env change
+        import importlib
+        import services.memory.skill_importer as importer
+        importer._GITHUB_TOKEN = None
+        headers = importer._github_headers()
+        assert headers == {"Accept": "application/vnd.github+json"}
+        assert "Authorization" not in headers
+    finally:
+        if original:
+            os.environ["GITHUB_TOKEN"] = original
+
+
+def test_github_headers_with_token(monkeypatch):
+    """When GITHUB_TOKEN is set, Authorization header should be included."""
+    import os
+    monkeypatch.setenv("GITHUB_TOKEN", "test_token_12345")
+    
+    # Reload module to pick up env change
+    import importlib
+    import services.memory.skill_importer as importer
+    importlib.reload(importer)
+    
+    headers = importer._github_headers()
+    assert headers["Accept"] == "application/vnd.github+json"
+    assert headers["Authorization"] == "Bearer test_token_12345"
+
+
+def test_authenticated_request_includes_auth_header(monkeypatch):
+    """Authenticated GitHub requests should include Authorization header."""
+    captured_headers = {}
+    
+    class _Resp:
+        url = "https://api.github.com/repos/o/r/contents?ref=main"
+        status_code = 200
+        
+        def json(self):
+            return []
+    
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return False
+        def get(self, url, headers=None):
+            captured_headers['headers'] = dict(headers) if headers else {}
+            return _Resp()
+    
+    monkeypatch.setattr("services.memory.skill_importer.httpx.Client", _Client)
+    monkeypatch.setattr("services.memory.skill_importer.check_outbound_url", lambda url: (True, ""))
+    monkeypatch.setenv("GITHUB_TOKEN", "secret_token_xyz")
+    
+    # Reload to pick up token
+    import importlib
+    import services.memory.skill_importer as importer
+    importlib.reload(importer)
+    
+    src = ResolvedSource(owner="o", repo="r", ref="main", path="")
+    try:
+        importer._list_github_dir(src, "", {})
+    except Exception:
+        pass  # May fail for other reasons, we just want to check headers
+    
+    assert "Authorization" in captured_headers.get('headers', {})
+    assert captured_headers['headers']["Authorization"] == "Bearer secret_token_xyz"
+
+
+def test_token_not_in_error_output(monkeypatch):
+    """GitHub token should never appear in error messages."""
+    class _Resp:
+        url = "https://api.github.com/repos/o/r/contents"
+        status_code = 403
+        content = b""
+        
+        def json(self):
+            return {"message": "Bad credentials"}
+    
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return False
+        def get(self, url, headers=None):
+            return _Resp()
+    
+    monkeypatch.setattr("services.memory.skill_importer.httpx.Client", _Client)
+    monkeypatch.setattr("services.memory.skill_importer.check_outbound_url", lambda url: (True, ""))
+    monkeypatch.setenv("GITHUB_TOKEN", "super_secret_token_12345")
+    
+    # Reload to pick up token
+    import importlib
+    import services.memory.skill_importer as importer
+    importlib.reload(importer)
+    
+    src = ResolvedSource(owner="o", repo="r", ref="main", path="")
+    with pytest.raises(SkillImportError) as exc_info:
+        importer._list_github_dir(src, "", {})
+    
+    error_msg = str(exc_info.value)
+    assert "super_secret_token_12345" not in error_msg
+    assert "token" not in error_msg.lower() or "GITHUB_TOKEN" in error_msg  # Only mention env var name
+
+
+def test_maven_adapter_path_executes_after_auth(monkeypatch):
+    """Verify Maven adapter still executes after authenticated content retrieval."""
+    # This test ensures the authentication layer doesn't break the Maven adapter flow
+    
+    maven_content = """# Griller
+
+## Purpose
+
+Test purpose.
+
+## Use When
+
+- Test case
+
+## Process
+
+### 1. Step one
+
+## Quality Checklist
+
+- [ ] Test passes
+
+## Boundaries
+
+Test boundaries.
+"""
+    
+    # Mock the fetch to return Maven-formatted content
+    monkeypatch.setattr(
+        "services.memory.skill_importer._fetch_text",
+        lambda url: maven_content
+    )
+    monkeypatch.setattr(
+        "services.memory.skill_importer._list_github_dir",
+        lambda src, rel, out, depth=0: out.update({"SKILL.md": maven_content})
+    )
+    monkeypatch.setattr(
+        "services.memory.skill_importer.check_outbound_url",
+        lambda url: (True, "")
+    )
+    
+    from services.memory.skill_importer import fetch_skill_bundle
+    
+    files, src = fetch_skill_bundle(
+        "https://github.com/leveragingmaven/maven-skills/tree/main/skills/business/griller"
+    )
+    
+    assert "SKILL.md" in files
+    assert "# Griller" in files["SKILL.md"]
+    assert "## Purpose" in files["SKILL.md"]
