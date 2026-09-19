@@ -57,9 +57,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.gzip import GZipMiddleware
+from src.static_serving import RevalidatingStaticFiles, SelectiveGZipMiddleware
 
 # Core imports
 from core.constants import (
@@ -148,12 +147,14 @@ app.add_middleware(
 # ========= RESPONSE COMPRESSION (gzip) =========
 # The frontend's text assets (style.css, index.html, the JS bundles) shipped
 # uncompressed on every cold load. gzip cuts CSS/JS/HTML by ~75-85% on the wire
-# with no behavioural change. Starlette's GZipMiddleware excludes
-# `text/event-stream` by default, so the SSE streams (chat, shell, research,
-# model-probe — all served with media_type="text/event-stream") are never
-# compressed or buffered; only complete bodies over minimum_size are. The
-# security-header middleware composes cleanly on top.
-app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=6)
+# with no behavioural change. SelectiveGZipMiddleware extends Starlette's
+# GZipMiddleware: it also skips already-compressed formats (png, woff2, zip,
+# ...) that Starlette 1.3.x would pointlessly re-compress per request, and
+# still excludes `text/event-stream`, so the SSE streams (chat, shell,
+# research, model-probe — all served with media_type="text/event-stream")
+# are never compressed or buffered; only complete bodies over minimum_size
+# are. The security-header middleware composes cleanly on top.
+app.add_middleware(SelectiveGZipMiddleware, minimum_size=1024, compresslevel=6)
 
 # ========= SECURITY HEADERS MIDDLEWARE =========
 app.add_middleware(SecurityHeadersMiddleware)
@@ -483,23 +484,17 @@ else:
 os.makedirs(STATIC_DIR, exist_ok=True)
 
 
-class _RevalidatingStatic(StaticFiles):
-    """Serve static assets normally, but force the browser to REVALIDATE
-    source files (.js/.css/.html) on every load instead of serving a stale
-    copy from disk cache. The app ships raw ES modules with no build step or
-    versioned URLs, so browsers were caching modules across deploys — a code
-    change wouldn't appear without a manual hard-refresh. `no-cache` keeps the
-    cached bytes but requires a conditional request; unchanged files still
-    return a cheap 304 (ETag/Last-Modified are preserved)."""
-
-    async def get_response(self, path, scope):
-        resp = await super().get_response(path, scope)
-        if path.endswith((".js", ".css", ".html")):
-            resp.headers["Cache-Control"] = "no-cache"
-        return resp
-
-
-app.mount("/static", _RevalidatingStatic(directory=STATIC_DIR), name="static")
+# Static cache policy (see src/static_serving.py for the rationale):
+# - HTML: always revalidated (`no-cache`) so a new deployment's shell — and
+#   the `?v=` asset versions it references — is discovered immediately.
+# - JS/CSS/other deploy text: bounded `max-age=300, stale-while-revalidate`:
+#   warm loads skip the ~160 per-file revalidation round-trips that dominated
+#   the measured load waterfall; after 5 minutes the cached copy is served
+#   while a background refresh runs, so post-deploy staleness self-heals on
+#   the next navigation instead of stranding users on old JS.
+# - Media/binary: `max-age=30d, immutable` (they only change with the image).
+# ETag/Last-Modified are preserved, so conditional requests still 304.
+app.mount("/static", RevalidatingStaticFiles(directory=STATIC_DIR), name="static")
 
 # ========= GENERATED IMAGES =========
 @app.get("/api/generated-image/{filename}")

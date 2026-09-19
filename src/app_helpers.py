@@ -46,7 +46,9 @@ def serve_html_with_nonce(request: Request, file_path: str) -> HTMLResponse:
         raise HTTPException(500, "Internal server error")
     nonce = getattr(request.state, "csp_nonce", "")
     html = html.replace("{{CSP_NONCE}}", nonce)
-    return HTMLResponse(html)
+    # Always revalidate the HTML shell: it carries the `?v=` asset version
+    # queries, so this is what lets a new deployment take over cleanly.
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
 def inside_base_dir(base_dir: str, path: str) -> bool:
