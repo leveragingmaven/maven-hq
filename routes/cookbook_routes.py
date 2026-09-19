@@ -1963,7 +1963,12 @@ def setup_cookbook_routes() -> APIRouter:
         # running the ollama-not-found preflight which exits 127.
         if re.search(r"\bollama\s+serve\b", req.cmd) and "OLLAMA_HOST=" not in req.cmd:
             _ollama_bind_host = "0.0.0.0" if remote else "127.0.0.1"
-            _ollama_chosen_port = _pick_free_port_for_ollama(
+            # Remote path shells out to ssh (sync subprocess.run, up to 8s
+            # timeout) and the local path probes ports with blocking sockets.
+            # Offload to a worker thread so this async handler doesn't stall
+            # the event loop while picking a free serve port.
+            _ollama_chosen_port = await asyncio.to_thread(
+                _pick_free_port_for_ollama,
                 remote, req.ssh_port, start_port=11434, max_offset=10,
             )
             if _ollama_chosen_port:

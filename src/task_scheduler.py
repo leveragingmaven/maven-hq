@@ -1837,7 +1837,12 @@ class TaskScheduler:
             msg["X-Odysseus-Kind"] = "task"
             msg["X-Odysseus-Ref"] = str(task.id)
             msg.set_content(result or "")
-            _send_smtp_message(cfg, from_addr, [to_addr], msg.as_string(), timeout=30)
+            # _send_smtp_message does sync SMTP I/O (and may issue a sync
+            # Google token-refresh httpx call). Offload so a slow SMTP server
+            # can't stall the event loop that also serves UI requests.
+            await asyncio.to_thread(
+                _send_smtp_message, cfg, from_addr, [to_addr], msg.as_string(), timeout=30
+            )
             logger.info("Task %s emailed result (recipient_set=%s, %sb)", task.id, bool(to_addr), len(result or ""))
         except Exception as e:
             logger.error("Task %s email delivery failed: %s", task.id, e, exc_info=True)

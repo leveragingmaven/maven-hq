@@ -416,15 +416,21 @@ if AUTH_ENABLED:
                             if app.state._token_cache_dirty:
                                 await _asyncio.to_thread(_refresh_token_cache)
                     candidates = list(_token_cache.get(prefix, ()))
-                    matched_id = None
-                    matched_owner = None
-                    matched_scopes = []
-                    for tid, thash, owner, scopes in candidates:
-                        if _bcrypt.checkpw(raw_token.encode(), thash.encode()):
-                            matched_id = tid
-                            matched_owner = owner
-                            matched_scopes = scopes or []
-                            break
+
+                    # bcrypt.checkpw is deliberately CPU-expensive (~100-300ms
+                    # per candidate hash). Running it inline in this coroutine
+                    # blocks the single event loop, freezing every other
+                    # in-flight request — the same DoS-amplification the login
+                    # path fix addressed (see tests/test_auth_event_loop.py).
+                    # Offload the whole candidate scan to a worker thread; the
+                    # early-break on first match is preserved inside the helper.
+                    def _match_api_token():
+                        for tid, thash, owner, scopes in candidates:
+                            if _bcrypt.checkpw(raw_token.encode(), thash.encode()):
+                                return tid, owner, (scopes or [])
+                        return None, None, []
+
+                    matched_id, matched_owner, matched_scopes = await _asyncio.to_thread(_match_api_token)
                     if matched_id:
                         # Update last_used_at off the hot path. Doing it
                         # inline used to keep the request open across an

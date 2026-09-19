@@ -16,6 +16,7 @@ Pure helpers live in `email_helpers.py`. Routes themselves live in
 `email_routes.py`.
 """
 
+import asyncio
 import email as email_mod
 import email.utils  # the `email` binding is referenced as email.utils.parseaddr inside the pass
 import smtplib
@@ -894,7 +895,13 @@ async def _auto_summarize_pass_single(days_back: int = 1, account_id: str | None
                                     outer_alert["Importance"] = "high"
                                     outer_alert.attach(MIMEText(alert_body, "plain", "utf-8"))
                                     outer_alert.attach(MIMEText(alert_html, "html", "utf-8"))
-                                    _send_smtp_message(cfg, cfg["from_address"], [to_addr], outer_alert.as_string())
+                                    # Sync SMTP I/O (may also refresh a Google
+                                    # token via sync httpx). Offload so a slow
+                                    # SMTP server can't stall the event loop.
+                                    await asyncio.to_thread(
+                                        _send_smtp_message,
+                                        cfg, cfg["from_address"], [to_addr], outer_alert.as_string(),
+                                    )
                                     logger.info(f"[urgency] Sent {urgency} alert email for: {subject!r}")
                                 except Exception as alert_err:
                                     logger.error(f"[urgency] Failed to send alert email: {alert_err}")

@@ -5,6 +5,7 @@ CardDAV contacts integration. Reads from local Radicale, supports
 search and adding new contacts.
 """
 
+import asyncio
 import re
 import logging
 import uuid
@@ -741,13 +742,13 @@ def setup_contacts_routes():
     @router.get("/list")
     async def list_contacts(_admin: str = Depends(require_admin)):
         """List all contacts."""
-        contacts = _fetch_contacts()
+        contacts = await asyncio.to_thread(_fetch_contacts)
         return {"contacts": contacts, "count": len(contacts)}
 
     @router.get("/search")
     async def search_contacts(q: str = Query(""), _admin: str = Depends(require_admin)):
         """Search contacts by name or email. Returns up to 10 matches."""
-        contacts = _fetch_contacts()
+        contacts = await asyncio.to_thread(_fetch_contacts)
         if not q:
             return {"results": []}
         q_lower = q.lower()
@@ -778,7 +779,7 @@ def setup_contacts_routes():
             return {"success": False, "error": "Name, email, phone, or address required"}
         if not name:
             name = email.split("@")[0] if email else (phones[0] if phones else "Contact")
-        contacts = _fetch_contacts()
+        contacts = await asyncio.to_thread(_fetch_contacts)
         for c in contacts:
             if email and email.lower() in [e.lower() for e in c.get("emails", [])]:
                 return {"success": True, "message": "Already exists", "contact": c}
@@ -786,20 +787,21 @@ def setup_contacts_routes():
                 return {"success": True, "message": "Already exists", "contact": c}
         create_params = inspect.signature(_create_contact).parameters
         if "phones" in create_params:
-            ok = _create_contact(name, email, address, phones=phones)
+            ok = await asyncio.to_thread(_create_contact, name, email, address, phones=phones)
         elif len(create_params) >= 3:
-            ok = _create_contact(name, email, address)
+            ok = await asyncio.to_thread(_create_contact, name, email, address)
         else:
-            ok = _create_contact(name, email)
+            ok = await asyncio.to_thread(_create_contact, name, email)
         # If a phone was provided, do an immediate update to thread it
         # through (the simple _create_contact signature only takes name +
         # email + address; phones happen via update).
         if ok and phones and "phones" not in create_params:
             try:
-                fresh = _fetch_contacts(force=True)
+                fresh = await asyncio.to_thread(_fetch_contacts, force=True)
                 created = next((c for c in fresh if name == c.get("name") and (not email or email in c.get("emails", []))), None)
                 if created:
-                    _update_contact(
+                    await asyncio.to_thread(
+                        _update_contact,
                         created["uid"], name,
                         created.get("emails", []),
                         phones,
@@ -822,7 +824,7 @@ def setup_contacts_routes():
                 return {"success": False, "error": "No vCard data found"}
             result = _import_vcards(text)
         elif csv_text.strip():
-            result = _import_csv_contacts(csv_text)
+            result = await asyncio.to_thread(_import_csv_contacts, csv_text)
         else:
             return {"success": False, "error": "No contact data found"}
         result["success"] = result.get("imported", 0) > 0
@@ -834,7 +836,7 @@ def setup_contacts_routes():
         _admin: str = Depends(require_admin),
     ):
         """Export all contacts as vCard or CSV."""
-        contacts = _fetch_contacts(force=True)
+        contacts = await asyncio.to_thread(_fetch_contacts, force=True)
         if format == "csv":
             content = _contacts_to_csv(contacts)
             media_type = "text/csv; charset=utf-8"
@@ -902,7 +904,7 @@ def setup_contacts_routes():
             return {"success": False, "error": "Name, email, or address required"}
         if not name and emails:
             name = emails[0].split("@")[0]
-        ok = _update_contact(uid, name, emails, phones, address)
+        ok = await asyncio.to_thread(_update_contact, uid, name, emails, phones, address)
         return {"success": ok}
 
     @router.delete("/{uid}")
@@ -910,7 +912,7 @@ def setup_contacts_routes():
         """Delete a contact by UID."""
         if not uid:
             return {"success": False, "error": "UID required"}
-        ok = _delete_contact(uid)
+        ok = await asyncio.to_thread(_delete_contact, uid)
         return {"success": ok}
 
     return router

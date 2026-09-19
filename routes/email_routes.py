@@ -5153,13 +5153,17 @@ def setup_email_routes():
         )
         import httpx as _httpx
         try:
-            resp = _httpx.post("https://oauth2.googleapis.com/token", data={
-                "code": code,
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "redirect_uri": redirect_uri,
-                "grant_type": "authorization_code",
-            }, timeout=10)
+            def _exchange_token():
+                return _httpx.post("https://oauth2.googleapis.com/token", data={
+                    "code": code,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code",
+                }, timeout=10)
+            # Sync httpx call (up to 10s timeout) — offload so this async
+            # handler can't stall the event loop on a slow Google endpoint.
+            resp = await asyncio.to_thread(_exchange_token)
             resp.raise_for_status()
             data = resp.json()
         except Exception:
@@ -5172,8 +5176,12 @@ def setup_email_routes():
         email_addr = ""
         display_name = ""
         try:
-            ui = _httpx.get("https://www.googleapis.com/oauth2/v1/userinfo",
-                            headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
+            def _fetch_userinfo():
+                return _httpx.get("https://www.googleapis.com/oauth2/v1/userinfo",
+                                  headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
+            # Sync httpx call (up to 10s timeout) — offloaded like the token
+            # exchange above.
+            ui = await asyncio.to_thread(_fetch_userinfo)
             if ui.is_success:
                 ui_data = ui.json()
                 email_addr = ui_data.get("email", "")
