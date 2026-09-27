@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections import Counter
 from typing import Optional
 
@@ -29,6 +30,38 @@ logger = logging.getLogger(__name__)
 MAX_RESULTS = 50
 MAX_QUERY_LENGTH = 256
 MAX_MARKDOWN_LENGTH = 12_000
+
+
+# Ignore grammatical words and generic task wording as relevance evidence.
+_SEARCH_STOPWORDS = frozenset(
+    "a an and are as at be by for from in is it of on or that the their this "
+    "to with you your my our me please help create make write generate find "
+    "use using need want strong best good aimed".split()
+)
+
+
+def _search_tokens(text: str) -> set[str]:
+    tokens = set()
+    for token in re.findall(r"[^\W_]+", text.casefold()):
+        if len(token) < 2 or token.isdecimal() or token in _SEARCH_STOPWORDS:
+            continue
+        # Lightweight regular-plural normalization, e.g. hooks -> hook.
+        if len(token) > 3 and token.endswith("s") and not token.endswith(("ss", "us", "is")):
+            token = token[:-1]
+        tokens.add(token)
+    return tokens
+
+
+def _matches_search(skill: dict, query_tokens: set[str]) -> bool:
+    if not query_tokens:
+        return False
+    metadata = " ".join(str(skill.get(key) or "") for key in
+                        ("id", "name", "description", "category", "when_to_use"))
+    metadata += " " + " ".join(str(item) for item in skill.get("tags") or [])
+    overlap = query_tokens & _search_tokens(metadata)
+    # Single-term searches remain useful; longer objectives need two distinct
+    # meaningful matches, never just one incidental word or repeated token.
+    return len(overlap) >= min(2, len(query_tokens))
 
 
 def setup_platform_skill_service_routes(skills_manager: SkillsManager) -> APIRouter:
@@ -87,7 +120,8 @@ def setup_platform_skill_service_routes(skills_manager: SkillsManager) -> APIRou
             raise HTTPException(status_code=400, detail="query is too long")
         platform, active_toolsets = context(platform, toolsets)
         allowlist = grants()
-        needle = (q or "").strip().lower()
+        query = (q or "").strip()
+        query_tokens = _search_tokens(query)
         results = []
         rejection_counts = Counter()
         allowlisted_ids = {grant.skill_id for grant in allowlist}
@@ -96,13 +130,6 @@ def setup_platform_skill_service_routes(skills_manager: SkillsManager) -> APIRou
             candidate_ids = {value.strip() for value in (skill.get("id"), skill.get("name")) if isinstance(value, str)}
             tracked_ids = candidate_ids & allowlisted_ids
             discovered_ids.update(tracked_ids)
-            if needle:
-                haystack = " ".join(str(skill.get(key) or "") for key in ("id", "name", "description", "category", "when_to_use"))
-                haystack += " " + " ".join(str(item) for item in skill.get("tags") or [])
-                if needle not in haystack.lower():
-                    if tracked_ids:
-                        rejection_counts["query_mismatch"] += 1
-                    continue
             reasons = [] if tracked_ids else None
             match = authorized(skill, platform=platform, active_toolsets=active_toolsets, allowlist=allowlist, rejection_reasons=reasons)
             if match is None:
@@ -110,6 +137,10 @@ def setup_platform_skill_service_routes(skills_manager: SkillsManager) -> APIRou
                     rejection_counts.update(reasons)
                 continue
             selected, markdown = match
+            if query and not _matches_search(selected, query_tokens):
+                if tracked_ids:
+                    rejection_counts["query_mismatch"] += 1
+                continue
             results.append({
                 "id": selected["id"],
                 "name": selected["name"],
