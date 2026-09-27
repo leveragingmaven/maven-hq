@@ -267,6 +267,7 @@ if AUTH_ENABLED:
         "/api/health",
         "/api/version",
         "/login",
+        "/internal/maven/platform-skills",
     }
     AUTH_EXEMPT_PREFIXES = ["/static"]
     # Dynamic paths whose own handler proves identity via a path-embedded
@@ -280,6 +281,7 @@ if AUTH_ENABLED:
     import re as _re
     AUTH_EXEMPT_PATTERNS = [
         _re.compile(r"^/api/tasks/[^/]+/webhook/[^/]+/?$"),
+        _re.compile(r"^/internal/maven/platform-skills/[^/]+/?$"),
     ]
 
     def _is_auth_exempt(path: str) -> bool:
