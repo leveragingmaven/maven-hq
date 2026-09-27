@@ -79,31 +79,41 @@ def authorize_platform_skill(
     *,
     platform: str | None = None,
     active_toolsets: Sequence[str] | None = None,
+    rejection_reasons: list[str] | None = None,
 ) -> bool:
     """Return whether a skill passes every existing gate and the allowlist."""
-    if not isinstance(skill, Mapping) or not isinstance(markdown, str):
+    def denied(reason: str) -> bool:
+        if rejection_reasons is not None:
+            rejection_reasons.append(reason)
         return False
+
+    if not isinstance(skill, Mapping) or not isinstance(markdown, str):
+        return denied("invalid_candidate")
     skill_id = skill.get("id") or skill.get("name")
     if not isinstance(skill_id, str) or not skill_id.strip() or skill.get("name") != skill_id:
-        return False
+        return denied("identity_mismatch")
     if skill.get("status") != "published":
-        return False
+        return denied("not_published")
     required_platforms = skill.get("platforms") or []
     if not isinstance(required_platforms, list) or any(not isinstance(item, str) for item in required_platforms):
-        return False
+        return denied("platform_metadata_invalid")
     if required_platforms and (not isinstance(platform, str) or platform not in required_platforms):
-        return False
+        return denied("platform_ineligible")
     required_toolsets = skill.get("requires_toolsets") or []
     fallback_toolsets = skill.get("fallback_for_toolsets") or []
     if not isinstance(required_toolsets, list) or not isinstance(fallback_toolsets, list):
-        return False
+        return denied("toolset_metadata_invalid")
     if any(not isinstance(item, str) for item in required_toolsets + fallback_toolsets):
-        return False
+        return denied("toolset_metadata_invalid")
     active = set(active_toolsets or ())
     if required_toolsets and (active_toolsets is None or not set(required_toolsets).issubset(active)):
-        return False
+        return denied("required_toolsets_missing")
     if fallback_toolsets and active.intersection(fallback_toolsets):
-        return False
+        return denied("fallback_toolset_active")
     revision = content_revision(markdown)
-    return any(grant.enabled and grant.skill_id == skill_id.strip() and grant.revision == revision for grant in grants)
+    allowed = any(grant.enabled and grant.skill_id == skill_id.strip() and grant.revision == revision for grant in grants)
+    if not allowed and rejection_reasons is not None:
+        matching = [grant for grant in grants if grant.skill_id == skill_id.strip()]
+        rejection_reasons.append("not_allowlisted" if not matching else "disabled" if not any(grant.enabled for grant in matching) else "revision_mismatch")
+    return allowed
 

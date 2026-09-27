@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import logging
+from collections import Counter
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -20,6 +23,8 @@ from services.memory.platform_skill_service_auth import (
     verify_request,
 )
 from services.memory.skills import SkillsManager
+
+logger = logging.getLogger(__name__)
 
 MAX_RESULTS = 50
 MAX_QUERY_LENGTH = 256
@@ -58,12 +63,14 @@ def setup_platform_skill_service_routes(skills_manager: SkillsManager) -> APIRou
             active = values
         return (platform.strip() if platform else None), active
 
-    def authorized(skill: dict, *, platform: Optional[str], active_toolsets: Optional[list[str]], allowlist) -> tuple[dict, str] | None:
+    def authorized(skill: dict, *, platform: Optional[str], active_toolsets: Optional[list[str]], allowlist, rejection_reasons=None) -> tuple[dict, str] | None:
         owner = skill.get("owner")
         markdown = skills_manager.read_skill_md(skill.get("name", ""), owner=owner)
         if markdown is None or len(markdown.encode("utf-8")) > MAX_MARKDOWN_LENGTH:
+            if rejection_reasons is not None:
+                rejection_reasons.append("markdown_unavailable" if markdown is None else "markdown_too_large")
             return None
-        if not authorize_platform_skill(skill, markdown, allowlist, platform=platform, active_toolsets=active_toolsets):
+        if not authorize_platform_skill(skill, markdown, allowlist, platform=platform, active_toolsets=active_toolsets, rejection_reasons=rejection_reasons):
             return None
         return skill, markdown
 
@@ -82,14 +89,25 @@ def setup_platform_skill_service_routes(skills_manager: SkillsManager) -> APIRou
         allowlist = grants()
         needle = (q or "").strip().lower()
         results = []
+        rejection_counts = Counter()
+        allowlisted_ids = {grant.skill_id for grant in allowlist}
+        discovered_ids = set()
         for skill in skills_manager.load_all():
+            candidate_ids = {value.strip() for value in (skill.get("id"), skill.get("name")) if isinstance(value, str)}
+            tracked_ids = candidate_ids & allowlisted_ids
+            discovered_ids.update(tracked_ids)
             if needle:
                 haystack = " ".join(str(skill.get(key) or "") for key in ("id", "name", "description", "category", "when_to_use"))
                 haystack += " " + " ".join(str(item) for item in skill.get("tags") or [])
                 if needle not in haystack.lower():
+                    if tracked_ids:
+                        rejection_counts["query_mismatch"] += 1
                     continue
-            match = authorized(skill, platform=platform, active_toolsets=active_toolsets, allowlist=allowlist)
+            reasons = [] if tracked_ids else None
+            match = authorized(skill, platform=platform, active_toolsets=active_toolsets, allowlist=allowlist, rejection_reasons=reasons)
             if match is None:
+                if reasons:
+                    rejection_counts.update(reasons)
                 continue
             selected, markdown = match
             results.append({
@@ -103,6 +121,19 @@ def setup_platform_skill_service_routes(skills_manager: SkillsManager) -> APIRou
             })
             if len(results) >= limit:
                 break
+        # Aggregate fixed reason codes only for allowlisted candidates; no values
+        # from the request, skill metadata, markdown, or allowlist are logged.
+        try:
+            logger.info("hq_platform_skill_discovery %s", json.dumps({
+                "event": "hq_platform_skill_discovery",
+                "allowlistCount": len(allowlist),
+                "allowlistedDiscoveredCount": len(discovered_ids),
+                "resultCount": len(results),
+                "limitReached": len(results) >= limit,
+                "rejections": dict(rejection_counts),
+            }, sort_keys=True))
+        except Exception:
+            pass  # Diagnostic failures must not affect discovery.
         return {"skills": results, "count": len(results)}
 
     @router.get("/{skill_id}")
