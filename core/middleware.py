@@ -3,6 +3,7 @@
 
 import os
 import secrets
+from urllib.parse import urlparse
 
 from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -56,6 +57,45 @@ def require_admin(request: Request):
         raise HTTPException(403, "Admin only")
 
 
+def frame_ancestors_allowlist() -> str | None:
+    """Validated CSP `frame-ancestors` source list from the FRAME_ANCESTORS env.
+
+    Accepts a comma-separated list of sources: the literal keyword ``'self'``
+    and/or ``https://`` origins (host[:port] only — no path, query, fragment,
+    or embedded credentials). Returns the normalized source list, or ``None``
+    when the setting is unset, empty, or contains any invalid token. Callers
+    fall back to the default deny policy (``frame-ancestors 'none'`` +
+    ``X-Frame-Options: DENY``), so a malformed value fails closed instead of
+    injecting arbitrary CSP directives.
+    """
+    raw = os.environ.get("FRAME_ANCESTORS", "")
+    tokens = [t.strip() for t in raw.split(",") if t.strip()]
+    if not tokens:
+        return None
+    sources: list[str] = []
+    for token in tokens:
+        if token == "'self'":
+            sources.append(token)
+            continue
+        parsed = urlparse(token)
+        if (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.path not in ("", "/")
+            or parsed.params
+            or parsed.query
+            or parsed.fragment
+        ):
+            return None
+        origin = f"https://{parsed.hostname.lower()}"
+        if parsed.port:
+            origin += f":{parsed.port}"
+        sources.append(origin)
+    return " ".join(sources)
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add standard security headers to all responses."""
 
@@ -105,7 +145,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 "frame-ancestors 'self'"
             )
         else:
-            response.headers["X-Frame-Options"] = "DENY"
+            # Frame policy: X-Frame-Options DENY + frame-ancestors 'none' by
+            # default. An explicitly configured, validated FRAME_ANCESTORS
+            # allowlist switches the default branch to a narrowly scoped CSP
+            # allowlist; X-Frame-Options is then omitted because it cannot
+            # express modern origin allowlists (only DENY/SAMEORIGIN).
+            frame_ancestors = frame_ancestors_allowlist()
+            if not frame_ancestors:
+                response.headers["X-Frame-Options"] = "DENY"
+            frame_ancestors_value = frame_ancestors or "'none'"
             # NOTE: `style-src 'unsafe-inline'` is intentionally retained.
             # `static/index.html` and `static/login.html` ship inline <style>
             # blocks, and several JS modules build runtime `style=""` attrs.
@@ -121,6 +169,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 "media-src 'self' blob:; "
                 "connect-src 'self'; "
                 "frame-src 'self'; "
-                "frame-ancestors 'none'"
+                f"frame-ancestors {frame_ancestors_value}"
             )
         return response
