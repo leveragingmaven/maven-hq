@@ -123,6 +123,19 @@ def test_allowlist_rejects_path_query_and_credentials(frame_env):
         assert frame_ancestors_allowlist() is None, bad
 
 
+def test_allowlist_accepts_bare_self_keyword(frame_env):
+    # Compose/orchestration layers can mangle CSP quoting, so the unquoted
+    # `self` keyword is accepted and normalized to the quoted CSP form.
+    frame_env("self,https://command.mavensync.space")
+    assert frame_ancestors_allowlist() == "'self' https://command.mavensync.space"
+    response = _client().get("/")
+    assert "x-frame-options" not in response.headers
+    assert (
+        "frame-ancestors 'self' https://command.mavensync.space"
+        in response.headers["content-security-policy"]
+    )
+
+
 def test_allowlist_allows_explicit_port_and_self_only(frame_env):
     frame_env("'self'")
     assert frame_ancestors_allowlist() == "'self'"

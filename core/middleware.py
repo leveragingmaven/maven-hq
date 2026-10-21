@@ -60,13 +60,13 @@ def require_admin(request: Request):
 def frame_ancestors_allowlist() -> str | None:
     """Validated CSP `frame-ancestors` source list from the FRAME_ANCESTORS env.
 
-    Accepts a comma-separated list of sources: the literal keyword ``'self'``
-    and/or ``https://`` origins (host[:port] only — no path, query, fragment,
-    or embedded credentials). Returns the normalized source list, or ``None``
-    when the setting is unset, empty, or contains any invalid token. Callers
-    fall back to the default deny policy (``frame-ancestors 'none'`` +
-    ``X-Frame-Options: DENY``), so a malformed value fails closed instead of
-    injecting arbitrary CSP directives.
+    Accepts a comma-separated list of sources: the ``self`` keyword (with or
+    without CSP quoting) and/or ``https://`` origins (host[:port] only — no
+    path, query, fragment, or embedded credentials). Returns the normalized
+    source list, or ``None`` when the setting is unset, empty, or contains any
+    invalid token. Callers fall back to the default deny policy
+    (``frame-ancestors 'none'`` + ``X-Frame-Options: DENY``), so a malformed
+    value fails closed instead of injecting arbitrary CSP directives.
     """
     raw = os.environ.get("FRAME_ANCESTORS", "")
     tokens = [t.strip() for t in raw.split(",") if t.strip()]
@@ -74,6 +74,9 @@ def frame_ancestors_allowlist() -> str | None:
         return None
     sources: list[str] = []
     for token in tokens:
+        if token.lower() == "self":
+            sources.append("'self'")
+            continue
         if token == "'self'":
             sources.append(token)
             continue
