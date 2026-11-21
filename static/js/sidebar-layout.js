@@ -105,7 +105,7 @@ export function initSidebarLayout(Storage, opts) {
 
   // Hamburger cycles: full sidebar → mini → off → full
   let _userToggledSidebar = false;
-  let _wasAutoCollapsed = false;
+  let _wasAutoCollapsed = window.innerWidth < 700 && el('sidebar')?.classList.contains('hidden');
 
   // Deliberate "open the sidebar" used by the mobile swipe gesture (wired at
   // module scope). It MUST set _userToggledSidebar so the auto-collapse

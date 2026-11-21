@@ -18,6 +18,8 @@
   window._odysseusLoadTime = Date.now();
   (function(){
     try {
+      var scale = localStorage.getItem('odysseus-ui-scale');
+      if (scale === '90' || scale === '125') document.documentElement.classList.add('ui-scale-' + scale);
       var t = JSON.parse(localStorage.getItem('odysseus-theme'));
       // MAVEN HQ BRANDING — migrate legacy default-dark theme to Maven palette
       // so existing users (with the old purple/teal dark theme saved in
@@ -88,7 +90,7 @@
       }
       // Apply font early
       if (t && t.font) {
-        var fm = {mono:"'Fira Code', monospace",sans:"system-ui, -apple-system, 'Segoe UI', sans-serif",serif:"Georgia, 'Times New Roman', serif",opendyslexic:"'OpenDyslexic', sans-serif"};
+        var fm = {mono:"'Fira Code', monospace",sans:"'Inter', system-ui, sans-serif",serif:"Georgia, 'Times New Roman', serif",opendyslexic:"'OpenDyslexic', sans-serif"};
         if (fm[t.font]) { s.setProperty('--font-family', fm[t.font]); }
         else { s.setProperty('--font-family', "'" + t.font.replace(/'/g,'') + "', sans-serif"); }
       }
@@ -96,12 +98,7 @@
       if (t && t.density && t.density !== 'comfortable') {
         document.documentElement.classList.add('density-' + t.density);
       }
-      // Apply UI text-size scale early (global accessibility pref, independent
-      // of the active theme) so there's no flash on load.
-      try {
-        var _us = localStorage.getItem('odysseus-ui-scale');
-        if (_us === '90' || _us === '125') document.documentElement.classList.add('ui-scale-' + _us);
-      } catch(e){}
+
       // Apply background pattern on body once available
       if (t && t.bgPattern && t.bgPattern !== 'none') {
         document.addEventListener('DOMContentLoaded', function() {
@@ -210,9 +207,9 @@
   <script defer src="/static/lib/highlight.min.js"></script>
   <!-- Inter font — self-hosted, no Google dependencies -->
   <style>
-    @font-face { font-family: 'Inter'; font-weight: 400; font-style: normal; font-display: swap; src: url('/static/fonts/Inter-Regular.woff2') format('woff2'); }
-    @font-face { font-family: 'Inter'; font-weight: 500; font-style: normal; font-display: swap; src: url('/static/fonts/Inter-Medium.woff2') format('woff2'); }
-    @font-face { font-family: 'Inter'; font-weight: 600; font-style: normal; font-display: swap; src: url('/static/fonts/Inter-SemiBold.woff2') format('woff2'); }
+    @font-face { font-family: 'Inter'; font-weight: 400; font-style: normal; font-display: optional; src: url('/static/fonts/Inter-Regular.woff2') format('woff2'); }
+    @font-face { font-family: 'Inter'; font-weight: 500; font-style: normal; font-display: optional; src: url('/static/fonts/Inter-Medium.woff2') format('woff2'); }
+    @font-face { font-family: 'Inter'; font-weight: 600; font-style: normal; font-display: optional; src: url('/static/fonts/Inter-SemiBold.woff2') format('woff2'); }
   </style>
   <!-- KaTeX CSS is loaded with media="print" so it doesn't block render,
        then flipped to "all" via JS after load. Mermaid init runs once the
@@ -231,6 +228,7 @@
       }, { once: true });
     })();
   </script>
+  <link rel="preload" href="/static/fonts/Inter-Regular.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/style.css?v=20260630mdfontsize">
   <!-- MAVEN HQ BRANDING -->
   <link rel="stylesheet" href="/static/maven-hq-brand.css?v=hq-polish-1">
@@ -243,24 +241,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content, viewport-fit=cover" />
 </head>
 <body>
-  <!-- Loading overlay — hides all flashing until app is ready -->
-  <div id="app-loader" style="position:fixed;inset:0;z-index:99999;background:var(--bg,#151314);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;transition:opacity .3s">
-    <div id="loader-wave" style="color:var(--brand-color,var(--red,#d4a858));font-family:monospace;font-size:11px;opacity:.5">▁▂▃</div>
-  </div>
-  <script nonce="{{CSP_NONCE}}">
-  (function(){
-    var el=document.getElementById('loader-wave');
-    if(!el)return;
-    var frames=['▁▂▃','▂▃▄','▃▄▅','▄▅▆','▅▆▅','▆▅▄','▅▄▃','▄▃▂','▃▂▁'];
-    var i=0;
-    var iv=setInterval(function(){
-      if(!document.getElementById('app-loader')){clearInterval(iv);return}
-      el.textContent=frames[i%frames.length];
-      i++;
-    },150);
-    setTimeout(function(){var l=document.getElementById('app-loader');if(l){l.style.opacity='0';setTimeout(function(){l.remove()},300)}},5000);
-  })();
-  </script>
   <!-- Memory Management Modal -->
   <div id="memory-modal" class="modal hidden">
     <div class="modal-content memory-modal-content" role="dialog" aria-label="Brain" style="background:var(--bg)">
@@ -971,6 +951,22 @@
       </div>
     </div>
   </nav>
+
+  <script nonce="{{CSP_NONCE}}">
+    (function () {
+      var sidebar = document.getElementById('sidebar');
+      var rail = document.getElementById('icon-rail');
+      var right = false;
+      try { right = localStorage.getItem('sidebar-side') === 'right'; } catch (_) {}
+      var collapsed = window.innerWidth < 700;
+      sidebar.classList.toggle('right-side', right);
+      sidebar.classList.toggle('hidden', collapsed);
+      rail.classList.toggle('right-side', right);
+      rail.style.display = collapsed ? '' : 'none';
+      document.body.classList.add(right ? 'hamburger-right' : 'hamburger-left');
+      document.body.classList.toggle('sidebar-collapsed', collapsed);
+    })();
+  </script>
 
   <main class="chat-container welcome-active" id="chat-container" aria-label="Chat area" aria-busy="false">
     <!-- Persistent page heading for assistive tech. Visually hidden so it

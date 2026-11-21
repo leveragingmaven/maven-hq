@@ -390,52 +390,90 @@ class SkillsManager:
         category: str = "imported",
     ) -> Dict:
         """Install a fetched skill bundle (relative path → text) under skills/."""
-        from .skill_importer import SkillImportError, pick_skill_md, _safe_relpath
+        import hashlib
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
         from core.atomic_io import atomic_write_text
+        from .maven_skill_adapter import adapt_if_maven
+        from .skill_importer import SkillImportError, _safe_relpath, pick_skill_md
 
-        if not files:
-            raise SkillImportError("empty bundle")
-        _rel, skill_md = pick_skill_md(files)
-        
-        # Maven Skills adapter: detect and transform Maven format to HQ format
+        relative_source, original = pick_skill_md(files)
+        source_path = _safe_relpath(relative_source)
+        parent = source_path.rpartition("/")[0]
+        prefix = f"{parent}/" if parent else ""
+        bundle = {}
+        seen = set()
+        for relative, content in files.items():
+            safe = _safe_relpath(relative)
+            if not safe.startswith(prefix):
+                raise SkillImportError("Bundle contains a file outside the skill folder")
+            leaf = safe[len(prefix):]
+            key = leaf.casefold()
+            if not leaf or key in seen or any(
+                ":" in part or part.endswith((".", " ")) for part in leaf.split("/")
+            ) or key in {".hq-import-digest", ".hq-original.md"}:
+                raise SkillImportError(f"Invalid or duplicate bundle path: {leaf!r}")
+            seen.add(key)
+            if safe != source_path:
+                bundle[leaf] = content
+
+        fingerprint = hashlib.sha256(json.dumps(
+            [original, bundle], sort_keys=True, ensure_ascii=False
+        ).encode("utf-8")).hexdigest()
+
+        existing = set()
+        for path in self._iter_skill_files():
+            current = self._read_skill(path)
+            if not current:
+                continue
+            existing.add(current.name)
+            if (current.owner or "") != (owner or ""):
+                continue
+            digest = Path(path).with_name(".hq-import-digest")
+            if digest.is_file() and digest.read_text(encoding="utf-8") == fingerprint:
+                return {**current.to_dict(), "_deduped": True}
+
         try:
-            from .maven_skill_adapter import adapt_if_maven
-            skill_md, was_adapted = adapt_if_maven(skill_md, source_url, category_override=category if category != "imported" else None)
-        except Exception as e:
-            logger.warning(f"Maven adapter failed for {_rel}: {e}")
-            raise SkillImportError(f"Failed to adapt skill: {e}") from e
-        
-        sk = Skill.from_markdown(skill_md)
-        nm = slugify(sk.name or _rel.split("/")[-2] or "skill")
-        cat = slugify(category or sk.category or "imported", fallback="imported")
+            skill_md, _ = adapt_if_maven(
+                original, source_url, category_override=category if category != "imported" else None
+            )
+            sk = Skill.from_markdown(skill_md)
+        except ValueError as exc:
+            raise SkillImportError("Invalid SKILL.md instructions or frontmatter") from exc
 
-        existing = {s["name"] for s in self.load_all()}
-        base = nm
+        base = slugify(sk.name or parent.rsplit("/", 1)[-1] or "skill")
+        nm = base
+        cat = slugify(category or sk.category or "imported", fallback="imported")
         i = 2
-        while nm in existing:
+        while nm in existing or os.path.lexists(self._skill_dir(cat, nm)):
             nm = f"{base}-{i}"
             i += 1
-
-        skill_dir = self._skill_dir(cat, nm)
-        os.makedirs(skill_dir, exist_ok=True)
-
-        # Preserve bundle layout (templates/, references/, etc.) under the skill dir.
-        for rel, content in files.items():
-            safe = _safe_relpath(rel)
-            dest = os.path.join(skill_dir, safe)
-            os.makedirs(os.path.dirname(dest), exist_ok=True)
-            atomic_write_text(dest, content)
 
         sk.name = nm
         sk.category = cat
         sk.owner = owner
         sk.source = "imported"
         if source_url:
-            extra = (sk.body_extra or "").strip()
-            note = f"Imported from {source_url}"
-            sk.body_extra = f"{extra}\n\n{note}".strip() if extra else note
-        atomic_write_text(self._skill_file(cat, nm), sk.to_markdown())
-        sk.path = self._skill_file(cat, nm)
+            sk.body_extra = f"{(sk.body_extra or '').strip()}\n\nImported from {source_url}".strip()
+
+        # Publish the complete directory at once, outside the indexer's scan
+        # until every companion file and the normalized manifest are written.
+        destination = Path(self._skill_dir(cat, nm))
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with TemporaryDirectory(dir=self.data_dir) as tmp:
+            stage = Path(tmp) / "skill"
+            stage.mkdir()
+            for rel, content in bundle.items():
+                target = stage / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                atomic_write_text(str(target), content)
+            atomic_write_text(str(stage / ".hq-original.md"), original)
+            atomic_write_text(str(stage / ".hq-import-digest"), fingerprint)
+            atomic_write_text(str(stage / "SKILL.md"), sk.to_markdown())
+            stage.rename(destination)
+
+        sk.path = str(destination / "SKILL.md")
         return sk.to_dict()
 
     def update_skill(self, skill_id: str, updates: Dict, owner: Optional[str] = None) -> bool:

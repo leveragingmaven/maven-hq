@@ -179,7 +179,7 @@ def _github_response_error(response: httpx.Response) -> SkillImportError:
             "or configure GITHUB_TOKEN for private repository access"
         )
     if status == 404:
-        return SkillImportError("path not found on GitHub")
+        return SkillImportError("Path not found on GitHub — check the repository, branch and skill folder. Private repositories require an authorized GITHUB_TOKEN.")
     if detail:
         return SkillImportError(f"GitHub request failed ({status}): {detail}")
     return SkillImportError(f"GitHub request failed ({status})")
@@ -247,7 +247,7 @@ def _list_github_dir(src: ResolvedSource, rel_dir: str, out: Dict[str, str], *, 
             continue
         dl = ent.get("download_url")
         if not dl:
-            continue
+            raise SkillImportError(f"GitHub did not provide the file {name!r}")
         _assert_github_url(dl, context="download URL")
         text = _fetch_text(dl)
         total += len(text.encode("utf-8"))
@@ -262,50 +262,27 @@ def fetch_skill_bundle(url: str) -> Tuple[Dict[str, str], ResolvedSource]:
     files: Dict[str, str] = {}
 
     path = _safe_relpath(src.path) if src.path else ""
-    if path.lower().endswith("skill.md"):
+    is_skill_file = path.rsplit("/", 1)[-1].lower() == "skill.md"
+    directory = path.rpartition("/")[0] if is_skill_file else path
+    if is_skill_file and not directory:
         files[path] = _fetch_text(_raw_url(src, path))
-        parent = "/".join(path.split("/")[:-1])
-        if parent:
-            try:
-                _list_github_dir(src, parent, files)
-            except SkillImportError:
-                pass
         return files, src
 
-    if path:
-        try:
-            _fetch_text(_raw_url(src, f"{path}/SKILL.md"))
-            _list_github_dir(src, path, files)
-            return files, src
-        except Exception:
-            pass
-        try:
-            text = _fetch_text(_raw_url(src, path))
-            if path.lower().endswith(".md"):
-                files[path] = text
-                return files, src
-        except Exception:
-            pass
-        _list_github_dir(src, path, files)
-    else:
-        _list_github_dir(src, "", files)
-
-    if not any(p.lower().endswith("skill.md") for p in files):
-        # Flat repo root with SKILL.md only
-        try:
-            files["SKILL.md"] = _fetch_text(_raw_url(src, "SKILL.md"))
-        except Exception as e:
-            raise SkillImportError(
-                "No SKILL.md found — link to a skill folder or SKILL.md on GitHub"
-            ) from e
+    _list_github_dir(src, directory, files)
+    root = f"{directory}/" if directory else ""
+    if not any(p.lower() == (root + "SKILL.md").lower() for p in files):
+        raise SkillImportError("No SKILL.md at this location — link directly to a skill folder or SKILL.md on GitHub")
     return files, src
 
 
 def pick_skill_md(files: Dict[str, str]) -> Tuple[str, str]:
-    for rel, content in files.items():
-        if rel.lower().endswith("skill.md"):
-            return rel, content
-    raise SkillImportError("bundle has no SKILL.md")
+    entries = [(rel, content) for rel, content in files.items()
+               if rel.replace("\\", "/").rsplit("/", 1)[-1].lower() == "skill.md"]
+    if len(entries) != 1:
+        raise SkillImportError("Import one skill folder containing a single SKILL.md")
+    if not entries[0][1].strip():
+        raise SkillImportError("SKILL.md is empty")
+    return entries[0]
 
 
 def default_category_from_source(src: ResolvedSource) -> str:

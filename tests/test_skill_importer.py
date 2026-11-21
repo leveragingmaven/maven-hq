@@ -176,7 +176,7 @@ def test_fetch_bytes_surfaces_github_error_detail(monkeypatch):
             return {"message": "Forbidden"}
 
     _mock_httpx_client(monkeypatch, _Resp())
-    with pytest.raises(SkillImportError, match="GitHub request failed \\(403\\): Forbidden"):
+    with pytest.raises(SkillImportError, match="repository or path is not accessible"):
         _fetch_bytes("https://raw.githubusercontent.com/o/r/main/SKILL.md")
 
 
@@ -207,10 +207,8 @@ def test_github_headers_with_token(monkeypatch):
     import os
     monkeypatch.setenv("GITHUB_TOKEN", "test_token_12345")
     
-    # Reload module to pick up env change
-    import importlib
     import services.memory.skill_importer as importer
-    importlib.reload(importer)
+    monkeypatch.setattr(importer, "_GITHUB_TOKEN", __import__("os").environ.get("GITHUB_TOKEN"))
     
     headers = importer._github_headers()
     assert headers["Accept"] == "application/vnd.github+json"
@@ -243,10 +241,8 @@ def test_authenticated_request_includes_auth_header(monkeypatch):
     monkeypatch.setattr("services.memory.skill_importer.check_outbound_url", lambda url: (True, ""))
     monkeypatch.setenv("GITHUB_TOKEN", "secret_token_xyz")
     
-    # Reload to pick up token
-    import importlib
     import services.memory.skill_importer as importer
-    importlib.reload(importer)
+    monkeypatch.setattr(importer, "_GITHUB_TOKEN", __import__("os").environ.get("GITHUB_TOKEN"))
     
     src = ResolvedSource(owner="o", repo="r", ref="main", path="")
     try:
@@ -280,12 +276,9 @@ def test_token_not_in_error_output(monkeypatch):
     
     monkeypatch.setattr("services.memory.skill_importer.httpx.Client", _Client)
     monkeypatch.setattr("services.memory.skill_importer.check_outbound_url", lambda url: (True, ""))
-    monkeypatch.setenv("GITHUB_TOKEN", "super_secret_token_12345")
-    
-    # Reload to pick up token
-    import importlib
     import services.memory.skill_importer as importer
-    importlib.reload(importer)
+
+    monkeypatch.setattr(importer, "_GITHUB_TOKEN", "super_secret_token_12345")
     
     src = ResolvedSource(owner="o", repo="r", ref="main", path="")
     with pytest.raises(SkillImportError) as exc_info:
@@ -330,7 +323,7 @@ Test boundaries.
     )
     monkeypatch.setattr(
         "services.memory.skill_importer._list_github_dir",
-        lambda src, rel, out, depth=0: out.update({"SKILL.md": maven_content})
+        lambda src, rel, out, depth=0: out.update({f"{rel}/SKILL.md": maven_content})
     )
     monkeypatch.setattr(
         "services.memory.skill_importer.check_outbound_url",
@@ -343,6 +336,34 @@ Test boundaries.
         "https://github.com/leveragingmaven/maven-skills/tree/main/skills/business/griller"
     )
     
-    assert "SKILL.md" in files
-    assert "# Griller" in files["SKILL.md"]
-    assert "## Purpose" in files["SKILL.md"]
+    manifest = files["skills/business/griller/SKILL.md"]
+    assert "# Griller" in manifest
+    assert "## Purpose" in manifest
+
+
+def test_nested_manifest_is_not_accepted_as_the_requested_bundle(monkeypatch):
+    from services.memory.skill_importer import fetch_skill_bundle
+
+    monkeypatch.setattr(
+        "services.memory.skill_importer._list_github_dir",
+        lambda src, rel, out: out.update({f"{rel}/other/SKILL.md": "# Other"}),
+    )
+    with pytest.raises(SkillImportError, match="No SKILL.md at this location"):
+        fetch_skill_bundle("https://github.com/example/tools/tree/main/skills")
+
+
+def test_bundle_preserves_relative_files_and_deduplicates_by_owner(tmp_path):
+    from services.memory.skills import SkillsManager
+
+    manager = SkillsManager(str(tmp_path))
+    files = {
+        "skills/example/SKILL.md": "---\nname: example\n---\n## Procedure\n- Prepare notes.\n",
+        "skills/example/references/notes.txt": "Supporting notes",
+    }
+    first = manager.import_bundle_from_files(files, owner="alice")
+    again = manager.import_bundle_from_files(files, owner="alice")
+    assert again["_deduped"] is True
+    assert [item["name"] for item in manager.load(owner="alice")] == [first["name"]]
+    assert not manager.load(owner="bob")
+    assert (tmp_path / "skills" / "imported" / "example" / "references" / "notes.txt").read_text() == "Supporting notes"
+    assert "Prepare notes." in manager.read_skill_md(first["name"], owner="alice")

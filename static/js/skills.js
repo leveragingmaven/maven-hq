@@ -1855,6 +1855,7 @@ async function importSkillFromUrl() {
     return;
   }
   const btn = document.getElementById('skill-import-url-btn');
+  if (btn?.disabled) return;
   if (btn) btn.disabled = true;
   try {
     const res = await fetch(`${API}/api/skills/import-from-url`, {
@@ -1867,7 +1868,7 @@ async function importSkillFromUrl() {
     if (input) input.value = '';
     await loadSkills();
     const name = data.skill?.name || 'skill';
-    uiModule.showToast(`Imported ${name} (${data.files || 1} file(s))`);
+    uiModule.showToast(data.deduped ? `${name} is already imported` : `Imported ${name} (${data.files || 1} file(s))`);
     if (name) openSkill(name);
   } catch (err) {
     uiModule.showError('Import failed: ' + err.message);

@@ -1279,8 +1279,10 @@ def setup_skills_routes(skills_manager: SkillsManager) -> APIRouter:
             logger.error("skill import failed: %s", e)
             raise HTTPException(500, "Skill import failed") from e
 
-        _fire_skill_added(user)
-        return {"ok": True, "skill": entry, "files": len(files)}
+        deduped = bool(entry.pop("_deduped", False))
+        if not deduped:
+            _fire_skill_added(user)
+        return {"ok": True, "deduped": deduped, "skill": entry, "files": len(files)}
 
     @router.post("/add")
     async def add_skill(request: Request, body: SkillAddRequest):
