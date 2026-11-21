@@ -3,10 +3,28 @@
  */
 
 import uiModule from './ui.js';
-import { openEditor, closeEditor, isEditorOpen } from './galleryEditor.js';
 import spinnerModule from './spinner.js';
 import { makeWindowDraggable } from './windowDrag.js';
 import { bindMenuDismiss, dismissOrRemove } from './escMenuStack.js';
+let editorModule;
+
+async function openEditor(...args) {
+  try {
+    editorModule ??= await import('./galleryEditor.js');
+    await editorModule.openEditor(...args);
+  } catch (error) {
+    console.error('[gallery] Could not open editor:', error);
+    uiModule.showError('Could not open the image editor. Reload HQ and try again.');
+  }
+}
+
+function isEditorOpen() {
+  return editorModule?.isEditorOpen() ?? false;
+}
+
+function closeEditor() {
+  editorModule?.closeEditor();
+}
 import { topPortalZ } from './toolWindowZOrder.js';
 import sessionModule from './sessions.js';
 import fileHandlerModule from './fileHandler.js';
