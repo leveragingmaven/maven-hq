@@ -156,11 +156,14 @@
   width: clamp(5rem, 18dvh, 9rem);
   height: clamp(5rem, 18dvh, 9rem);
   object-fit: contain;
+  object-position: center;
+  visibility: hidden;
   margin-bottom: .55rem;
   border: 1px solid color-mix(in srgb, var(--hq-gold) 50%, transparent);
   border-radius: 1rem;
   background: radial-gradient(ellipse at 50% 32%, #49321d, #191617 73%);
 }
+.maven-portrait-ready .mvp-welcome-portrait { visibility: visible; }
 .mvp-chat-identity {
   display: inline-flex;
   align-items: center;
@@ -180,7 +183,8 @@
   height: 1.35rem;
   border: 1px solid #987343;
   border-radius: 50%;
-  background: #2a2119 url('/static/icons/maven-portrait.png') center 14% / 142% auto no-repeat;
+  background: #2a2119 url('/static/icons/maven-portrait.png') center / contain no-repeat;
+  visibility: hidden;
 }
 #chat-history .msg-ai:not(.msg-group):not(.msg-continuation) .role::after {
   order: -1;
@@ -196,3 +200,8 @@
 }
 
 @media (min-height: 651px) and (min-width: 769px) { #welcome-screen { top: 37%; } }
+
+.maven-portrait-ready .mvp-chat-identity::before,
+.maven-portrait-ready #chat-history .msg-ai:not(.msg-group):not(.msg-continuation) .role::after {
+  visibility: visible;
+}

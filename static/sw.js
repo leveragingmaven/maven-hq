@@ -7,7 +7,7 @@
 //   - Other static assets (images/fonts/libs): cache-first with bg refresh.
 //   - API / non-GET: never cached.
 // Bump CACHE_NAME whenever the precache list or SW logic changes.
-const CACHE_NAME = 'odysseus-v348';
+const CACHE_NAME = 'odysseus-v349';
 
 // Core shell precached on install so repeat opens are instant without any
 // network wait. Keep this list in sync with the <script type="module"> tags
@@ -15,7 +15,7 @@ const CACHE_NAME = 'odysseus-v348';
 const PRECACHE = [
   '/',
   '/static/style.css',
-  '/static/maven-hq-brand.css?v=maven-portrait-1',
+  '/static/maven-hq-brand.css?v=maven-portrait-2',
   '/static/app.js',
   '/static/js/storage.js',
   '/static/js/ui.js',

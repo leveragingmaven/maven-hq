@@ -4044,11 +4044,6 @@ function startOdysseusApp() {
   // Initial icon state
   _updateSendBtnIcon();
 
-  // Auto-focus input on load
-  if (messageInput) {
-    setTimeout(() => messageInput.focus(), 100);
-  }
-
   // Add drag and drop handlers for the chat container
   const chatContainer = el('chat-container');
 
@@ -4257,7 +4252,7 @@ function startOdysseusApp() {
 
   // Auto-focus message input on load
   const msgEl = document.getElementById('message');
-  if (msgEl) msgEl.focus();
+  if (msgEl && window.innerWidth > 768) msgEl.focus();
   
   // Initialize mouse-based drag for sidebar sections
   const sidebar = document.getElementById('sidebar');
