@@ -37,6 +37,8 @@ export function syncWorkspaceIndicator(path) {
   const chat = _isChatMode();
   const pill = document.getElementById('workspace-indicator-btn');
   const name = document.getElementById('workspace-indicator-name');
+  const sidebar = document.getElementById('tool-workspace-btn');
+  if (sidebar) sidebar.hidden = chat;
   const overflow = document.getElementById('overflow-workspace-btn');
   if (pill) {
     pill.style.display = (path && !chat) ? '' : 'none';
@@ -201,6 +203,7 @@ export function initWorkspace() {
   syncWorkspaceIndicator(getWorkspace());
   const overflow = document.getElementById('overflow-workspace-btn');
   if (overflow) overflow.addEventListener('click', openWorkspaceBrowser);
+  document.getElementById('tool-workspace-btn')?.addEventListener('click', openWorkspaceBrowser);
   const pill = document.getElementById('workspace-indicator-btn');
   if (pill) pill.addEventListener('click', clearWorkspace);
 }

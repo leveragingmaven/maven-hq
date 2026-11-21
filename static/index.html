@@ -6,7 +6,7 @@
   <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
   <link rel="manifest" href="/static/manifest.json">
-  <meta name="theme-color" content="#282c34">
+  <meta name="theme-color" content="#151314">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <!-- Disable iOS / Android auto-linkifying of numbers (phone/date/address)
@@ -23,10 +23,14 @@
       // so existing users (with the old purple/teal dark theme saved in
       // localStorage) get the Maven gold/pink palette, not just new users.
       // Only migrates the pristine default-dark theme; custom themes untouched.
-      if (t && t.colors && (!t.name || t.name === 'dark') && t.colors.red === '#e06c75' && t.colors.fg === '#9cdef2' && t.colors.border === '#355a66') {
-        t.colors.red = '#d4a858';
-        t.colors.fg = '#f0a8c0';
-        t.colors.border = '#6a4555';
+      if (t && t.colors && (!t.name || t.name === 'dark') && (
+        (t.colors.red === '#e06c75' && t.colors.fg === '#9cdef2' && t.colors.border === '#355a66') ||
+        (t.colors.bg === '#282c34' && t.colors.panel === '#111111' && t.colors.fg === '#f0a8c0' &&
+          t.colors.border === '#6a4555' && t.colors.red === '#d4a858')
+      )) {
+        t.colors.bg = '#151314'; t.colors.panel = '#1d191b'; t.colors.red = '#f18bb7';
+        t.colors.fg = '#f7f3f4';
+        t.colors.border = '#4a3b40';
         try { localStorage.setItem('odysseus-theme', JSON.stringify(t)); } catch(e){}
       }
       // END MAVEN HQ BRANDING
@@ -96,7 +100,7 @@
       // of the active theme) so there's no flash on load.
       try {
         var _us = localStorage.getItem('odysseus-ui-scale');
-        if (_us && _us !== '100') document.documentElement.classList.add('ui-scale-' + _us);
+        if (_us === '90' || _us === '125') document.documentElement.classList.add('ui-scale-' + _us);
       } catch(e){}
       // Apply background pattern on body once available
       if (t && t.bgPattern && t.bgPattern !== 'none') {
@@ -229,7 +233,7 @@
   </script>
   <link rel="stylesheet" href="/static/style.css?v=20260630mdfontsize">
   <!-- MAVEN HQ BRANDING -->
-  <link rel="stylesheet" href="/static/maven-hq-brand.css">
+  <link rel="stylesheet" href="/static/maven-hq-brand.css?v=hq-polish-1">
   <!-- END MAVEN HQ BRANDING -->
   <link rel="modulepreload" href="/static/app.js?v=20260630mdfontsize">
   <link rel="modulepreload" href="/static/js/chat.js">
@@ -240,7 +244,7 @@
 </head>
 <body>
   <!-- Loading overlay — hides all flashing until app is ready -->
-  <div id="app-loader" style="position:fixed;inset:0;z-index:99999;background:var(--bg,#282c34);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;transition:opacity .3s">
+  <div id="app-loader" style="position:fixed;inset:0;z-index:99999;background:var(--bg,#151314);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;transition:opacity .3s">
     <div id="loader-wave" style="color:var(--brand-color,var(--red,#d4a858));font-family:monospace;font-size:11px;opacity:.5">▁▂▃</div>
   </div>
   <script nonce="{{CSP_NONCE}}">
@@ -611,9 +615,10 @@
           </div>
           <div class="theme-fd-group">
             <label class="theme-fd-label">Text size</label>
-            <select id="theme-text-size-select" class="theme-fd-select" aria-label="Text size">
+            <select id="theme-text-size-select" class="theme-fd-select" data-ui-scale aria-label="Text size">
+              <option value="90">Small</option>
               <option value="100">Default</option>
-              <option value="125">Larger</option>
+              <option value="125">Large</option>
             </select>
           </div>
           <div class="theme-fd-group" id="theme-frosted-group">
@@ -847,6 +852,8 @@
         <div class="section-header-flex">
           <span class="section-title"><svg class="section-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>Tools</span>
         </div>
+        <button type="button" class="list-item hq-tool-link" id="tool-workspace-btn" hidden>Workspace folders</button>
+        <button type="button" class="list-item hq-tool-link" id="tool-skills-btn">Skills</button>
         <div class="list-item" id="tool-memory-btn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -945,6 +952,13 @@
         </div>
       </div>
     </div>
+    <label class="hq-text-size">Text size
+      <select data-ui-scale aria-label="Sidebar text size">
+        <option value="90">Small</option>
+        <option value="100">Default</option>
+        <option value="125">Large</option>
+      </select>
+    </label>
     <div class="sidebar-user-bar" id="sidebar-user-bar">
       <div class="user-bar-left" id="user-bar-profile">
         <div class="user-bar-avatar" id="user-bar-avatar"></div>

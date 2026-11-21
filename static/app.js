@@ -1673,12 +1673,15 @@ function initializeEventListeners() {
 
   // Sidebar Memory button
   const toolMemoryBtn = el('tool-memory-btn');
-  if (toolMemoryBtn && memoryModal) {
-    toolMemoryBtn.addEventListener('click', () => {
+  if (memoryModal) {
+    const openMemoryTab = (tab) => {
       memoryModal.classList.remove('hidden');
-      if (memoryModule && memoryModule.renderMemoryList) memoryModule.renderMemoryList();
-      if (memoryModule && memoryModule.updateMemoryCount) memoryModule.updateMemoryCount();
-    });
+      memoryModal.querySelector(`[data-memory-tab="${tab}"]`)?.click();
+      if (tab === 'browse') memoryModule?.renderMemoryList?.();
+      memoryModule?.updateMemoryCount?.();
+    };
+    toolMemoryBtn?.addEventListener('click', () => openMemoryTab('browse'));
+    el('tool-skills-btn')?.addEventListener('click', () => openMemoryTab('skills'));
   }
 
   const addMemBtn = el('add-memory-btn');

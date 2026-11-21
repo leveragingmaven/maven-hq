@@ -15,11 +15,11 @@
 
 :root {
   /* Core palette */
-  --bg: #282c34;
-  --fg: #f0a8c0;
-  --panel: #111;
-  --border: #6a4555;
-  --red: #d4a858;
+  --bg: #151314;
+  --fg: #f7f3f4;
+  --panel: #1d191b;
+  --border: #4a3b40;
+  --red: #f18bb7;
   --green: #50fa7b;
   --warn: #f0ad4e;
 
@@ -34,8 +34,8 @@
 
   /* Syntax highlighting */
   --hl-bg: #1e2228;
-  --hl-fg: #f0a8c0;
-  --hl-keyword: #d4a858;
+  --hl-fg: #f7f3f4;
+  --hl-keyword: #f18bb7;
   --hl-string: #e5c07b;
   --hl-comment: #828997;
   --hl-function: #61afef;
@@ -66,7 +66,7 @@
   /* Font family — existing fonts kept as fallbacks.
       To adopt a brand font, prepend it here (e.g.
       'Brand Sans', 'Fira Code', monospace). */
-  --font-family: 'Fira Code', monospace;
+  --font-family: 'Inter', system-ui, sans-serif;
 }
 
 /* ── Light mode override ── */
@@ -86,4 +86,67 @@
   --hl-builtin: #c71585;
   --hl-variable: #383a42;
   --hl-params: #4a4f5c;
+}
+
+/* Keep HQ panels readable with both text sizes and on narrow displays. */
+:root {
+  --hq-gold: #e9c17b;
+  --hq-gold-surface: linear-gradient(115deg, #533b24, #2c231b 55%, var(--panel));
+}
+
+:root.ui-scale-90 { zoom: .9; }
+:root.ui-scale-90 body { height: calc(100dvh / .9); }
+
+.sidebar .hq-text-size {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .35rem .65rem;
+  padding: .5rem .75rem;
+  font-size: .85rem;
+  border-top: 1px solid var(--border);
+}
+.hq-text-size select {
+  min-height: 2rem;
+  max-width: 100%;
+  padding: .2rem .45rem;
+  border: 1px solid var(--border);
+  border-radius: .45rem;
+  color: var(--fg);
+  background: var(--panel);
+  font: inherit;
+}
+.sidebar .hq-tool-link {
+  width: 100%;
+  text-align: left;
+  color: var(--fg);
+  font: inherit;
+  font-size: .85rem;
+  background: transparent;
+  border: 0;
+  padding-inline-start: .65rem;
+}
+.sidebar .hq-tool-link[hidden] { display: none; }
+.sidebar .hq-tool-link:hover { background: color-mix(in srgb, var(--brand-color) 13%, var(--panel)); }
+:where(.sidebar, .modal-content, .chat-container) :is(button, select, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--brand-color);
+  outline-offset: 2px;
+}
+.admin-card {
+  min-width: 0;
+  border-radius: .75rem;
+  padding: clamp(.65rem, 2vw, 1rem);
+  overflow-wrap: anywhere;
+}
+.doclib-card { min-width: 0; }
+.doclib-card-title { overflow-wrap: anywhere; }
+:root:not(.light) .sidebar .section-header-flex {
+  background: var(--hq-gold-surface);
+  border-radius: .45rem;
+}
+:root:not(.light) .sidebar .section-title { color: var(--hq-gold); }
+:where(.sidebar, .modal-body, #chat-history) {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--fg) 28%, var(--panel)) transparent;
 }

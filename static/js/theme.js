@@ -9,7 +9,7 @@ import { makeWindowDraggable } from './windowDrag.js';
 import { snapModalToZone } from './tileManager.js';
 
 export const THEMES = {
-  dark:       { bg:'#282c34', fg:'#f0a8c0', panel:'#111111', border:'#6a4555', red:'#d4a858' },
+  dark:       { bg:'#151314', fg:'#f7f3f4', panel:'#1d191b', border:'#4a3b40', red:'#f18bb7' },
   light:      { bg:'#f0ebe3', fg:'#5a5248', panel:'#faf6f0', border:'#d4cdc2', red:'#c47d5a' },
   midnight:   { bg:'#0d1117', fg:'#c9d1d9', panel:'#161b22', border:'#30363d', red:'#f85149' },
   paper:      { bg:'#faf8f5', fg:'#3b3836', panel:'#ffffff', border:'#d5d0c8', red:'#c5ac4a' },
@@ -387,16 +387,15 @@ export function applyFontDensity(font, density) {
 
 // UI text-size scale (accessibility). Global and independent of the active
 // theme, so the chosen size persists across theme switches. Stored as a plain
-// percentage string ('100' | '110' | '125' | '150').
+// percentage string ('90' | '100' | '125').
 const UI_SCALE_KEY = 'odysseus-ui-scale';
 const DEFAULT_UI_SCALE = '100';
 
 export function applyUiScale(scale) {
-  const s = scale || DEFAULT_UI_SCALE;
-  // Only one non-default scale ('125'). Remove any legacy classes too so an
-  // older stored value can't leave a stale zoom applied.
-  document.documentElement.classList.remove('ui-scale-110', 'ui-scale-125', 'ui-scale-140');
-  if (s === '125') document.documentElement.classList.add('ui-scale-125');
+  const s = scale === '90' || scale === '125' ? scale : DEFAULT_UI_SCALE;
+  document.documentElement.classList.remove('ui-scale-90', 'ui-scale-110', 'ui-scale-125', 'ui-scale-140');
+  if (s !== DEFAULT_UI_SCALE) document.documentElement.classList.add('ui-scale-' + s);
+  document.querySelectorAll('[data-ui-scale]').forEach(select => { select.value = s; });
 }
 
 const _BG_CLASSES = ['bg-pattern-dots',
@@ -1145,18 +1144,15 @@ export function initThemeUI() {
       const s = getSaved(); if (s) _saveFull(s.name, s.colors);
     });
   }
-  const textSizeSelect = document.getElementById('theme-text-size-select');
-  if (textSizeSelect) {
-    const nts = textSizeSelect.cloneNode(true); textSizeSelect.parentNode.replaceChild(nts, textSizeSelect);
-    let initScale = DEFAULT_UI_SCALE;
-    try { initScale = localStorage.getItem(UI_SCALE_KEY) || DEFAULT_UI_SCALE; } catch (e) {}
-    nts.value = initScale;
-    applyUiScale(initScale);
-    nts.addEventListener('change', () => {
-      applyUiScale(nts.value);
-      try { localStorage.setItem(UI_SCALE_KEY, nts.value); } catch (e) {}
-    });
-  }
+  let initScale = DEFAULT_UI_SCALE;
+  try { initScale = localStorage.getItem(UI_SCALE_KEY) || DEFAULT_UI_SCALE; } catch (e) {}
+  applyUiScale(initScale);
+  document.querySelectorAll('[data-ui-scale]').forEach(select => {
+    select.onchange = () => {
+      applyUiScale(select.value);
+      try { localStorage.setItem(UI_SCALE_KEY, select.value); } catch (e) {}
+    };
+  });
   if (patternSelect) {
     const np = patternSelect.cloneNode(true); patternSelect.parentNode.replaceChild(np, patternSelect);
     np.value = _initPattern;
