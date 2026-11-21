@@ -1,22 +1,5 @@
-// Cookbook Schedule — opens a small inline form (styled with the app's
-// existing .cookbook-* classes) that creates a ScheduledTask with
-// action=cookbook_serve. Mounted from two places:
-//
-//   1. The ^ button next to Launch in a serve panel.
-//   2. The "Schedule…" entry in the cached-model ⋯ dropdown menu (which
-//      programmatically clicks the ^ button so this module owns the
-//      single source of truth).
-//
-// Feedback uses uiModule.showToast() — the same toast the rest of the
-// app uses for "Saved", "Favorited", etc. — so the success message
-// doesn't introduce a parallel notification style.
-//
-// To remove: delete this file + the <script> tag in index.html + the
-// ^ button in cookbookServe.js + the "cookbook_serve" entry in
-// BUILTIN_ACTIONS + src/cookbook_serve_lifecycle.py + its
-// registration line in app.py.
-
-try { (function () {
+// The Cookbook launch menu loads this form only when Schedule is selected.
+export const openCookbookSchedule = (() => {
   function _safe(fn) {
     return function () {
       try { return fn.apply(this, arguments); }
@@ -376,11 +359,5 @@ try { (function () {
     }));
   }
 
-  document.addEventListener("click", _safe((e) => {
-    const arrow = e.target.closest && e.target.closest(".hwfit-serve-schedule-arrow");
-    if (!arrow) return;
-    e.preventDefault();
-    e.stopPropagation();
-    openForm(arrow);
-  }));
-})(); } catch (e) { try { console.warn("[cookbookSchedule] top-level error:", e); } catch (_) {} }
+  return openForm;
+})();

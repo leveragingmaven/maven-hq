@@ -13,6 +13,17 @@ import { openCookbookDependencies } from './cookbook-diagnosis.js';
 import { _hwfitCache } from './cookbook-hwfit.js';
 import { topPortalZ } from './toolWindowZOrder.js';
 
+async function openSchedule(arrow) {
+  try {
+    const { openCookbookSchedule } = await import('./cookbookSchedule.js');
+    if (arrow.isConnected) openCookbookSchedule(arrow);
+  } catch (error) {
+    console.warn('Could not open Cookbook schedule:', error);
+    uiModule.showToast('Could not load the schedule form. Try Schedule again.');
+  }
+}
+
+
 // Shared state/functions injected by init()
 let _envState;
 let _sshCmd;
@@ -1104,14 +1115,9 @@ function _rerenderCachedModels() {
           else if (opt.action === 'delete') _deleteCachedModel(repo, item, false, m);
           else if (opt.action === 'retry') _retryCachedModel(repo, m);
           else if (opt.action === 'schedule') {
-            // Same entry point as the ^ button next to Launch — let
-            // cookbookSchedule.js handle it. Expand the panel first
-            // so the form has somewhere to mount.
             if (!item.querySelector('.hwfit-serve-panel')) item.click();
-            setTimeout(() => {
-              const arrow = item.querySelector('.hwfit-serve-schedule-arrow');
-              if (arrow) arrow.click();
-            }, 120);
+            const arrow = item.querySelector('.hwfit-serve-schedule-arrow');
+            if (arrow) openSchedule(arrow);
           }
           else if (opt.action === 'select') {
             const selectBtn = document.getElementById('hwfit-cache-select');
@@ -2477,7 +2483,6 @@ function _rerenderCachedModels() {
       const _launchMoreBtn = panel.querySelector('.hwfit-serve-schedule-arrow');
       if (_launchMoreBtn) {
         _launchMoreBtn.addEventListener('click', (ev) => {
-          if (ev.__openScheduleDirect) return;
           ev.preventDefault();
           ev.stopPropagation();
           document.querySelectorAll('.cookbook-launch-actions-menu').forEach(m => { if (typeof m._dismiss === 'function') m._dismiss(); else m.remove(); });
@@ -2504,11 +2509,7 @@ function _rerenderCachedModels() {
               : _formatServeCmdPreview(panel._cmd || cmdBox?.value || '');
             _copyText(cmd).then(() => uiModule.showToast('Launch command copied'));
           }));
-          menu.appendChild(mk('Schedule', '', () => {
-            const direct = new MouseEvent('click', { bubbles: true, cancelable: true });
-            direct.__openScheduleDirect = true;
-            _launchMoreBtn.dispatchEvent(direct);
-          }));
+          menu.appendChild(mk('Schedule', '', () => openSchedule(_launchMoreBtn)));
           menu.appendChild(mk('Clear Server', 'cookbook-dropdown-danger', () => _clearBtn?.click()));
           menu.appendChild(mk('Cancel', 'dropdown-cancel-mobile', () => {}));
           const r = _launchMoreBtn.getBoundingClientRect();
