@@ -4379,8 +4379,13 @@ function startOdysseusApp() {
   }
 }
 
+function startWhenStyled() {
+  if (window.hqStylesReady) window.hqStylesReady.then(startOdysseusApp);
+  else startOdysseusApp();
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', startOdysseusApp, { once: true });
+  document.addEventListener('DOMContentLoaded', startWhenStyled, { once: true });
 } else {
-  startOdysseusApp();
+  startWhenStyled();
 }

@@ -204,6 +204,42 @@
     } catch(e){}
   })();
   </script>
+  <style>
+    html.hq-styles-pending { background: var(--bg, #151314); color: var(--fg, #f7f3f4); }
+    .hq-styles-pending body { margin: 0; }
+    .hq-styles-pending body > :not(#chat-container),
+    .hq-styles-pending #chat-container > :not(#welcome-screen),
+    .hq-styles-pending #welcome-screen > :not(.welcome-name) { display: none !important; }
+    .hq-styles-pending #welcome-screen {
+      position: fixed; inset: 0; display: grid; place-items: center;
+      transform: none; opacity: 1 !important; animation: none !important;
+    }
+  </style>
+  <script nonce="{{CSP_NONCE}}">
+    (() => {
+      const root = document.documentElement;
+      root.classList.add('hq-styles-pending');
+      window.hqStylesReady = new Promise(resolve => {
+        const pending = new Set(['hq-core-css', 'hq-brand-css']);
+        const settle = event => {
+          const sheet = event.target;
+          if (!pending.delete(sheet.id)) return;
+          if (event.type === 'load') sheet.media = 'all';
+          if (!pending.size) {
+            document.removeEventListener('load', settle, true);
+            document.removeEventListener('error', settle, true);
+            root.classList.remove('hq-styles-pending');
+            resolve();
+          }
+        };
+        document.addEventListener('load', settle, true);
+        document.addEventListener('error', settle, true);
+      });
+    })();
+  </script>
+  <link id="hq-core-css" rel="stylesheet" href="/static/style.css?v=20260630mdfontsize" media="print">
+  <link id="hq-brand-css" rel="stylesheet" href="/static/maven-hq-brand.css?v=maven-portrait-2" media="print">
+  <noscript><link rel="stylesheet" href="/static/style.css?v=20260630mdfontsize"><link rel="stylesheet" href="/static/maven-hq-brand.css?v=maven-portrait-2"></noscript>
   <script defer src="/static/lib/highlight.min.js"></script>
   <!-- Inter font — self-hosted, no Google dependencies -->
   <style>
@@ -229,11 +265,7 @@
     })();
   </script>
   <link rel="preload" href="/static/fonts/Inter-Regular.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/static/style.css?v=20260630mdfontsize">
-  <!-- MAVEN HQ BRANDING -->
-  <link rel="stylesheet" href="/static/maven-hq-brand.css?v=maven-portrait-2">
-  <!-- END MAVEN HQ BRANDING -->
-  <link rel="modulepreload" href="/static/app.js?v=20260630mdfontsize">
+  <link rel="modulepreload" href="/static/app.js?v=hq-styles-1">
   <link rel="modulepreload" href="/static/js/chat.js">
   <link rel="modulepreload" href="/static/js/ui.js">
   <link rel="modulepreload" href="/static/js/sessions.js">
@@ -2518,7 +2550,7 @@
 <script type="module" src="/static/js/settings.js"></script>
 <script type="module" src="/static/js/admin.js"></script>
 <script type="module" src="/static/js/assistant.js"></script>
-<script type="module" src="/static/app.js?v=20260630mdfontsize"></script>  <!-- app.js must be LAST -->
+<script type="module" src="/static/app.js?v=hq-styles-1"></script>  <!-- app.js must be LAST -->
 <script type="module" src="/static/js/init.js"></script>
 <script type="module" src="/static/js/a11y.js"></script>
 <script nonce="{{CSP_NONCE}}">if('serviceWorker' in navigator){navigator.serviceWorker.register('/static/sw.js').catch(()=>{});}</script>
