@@ -150,3 +150,49 @@
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--fg) 28%, var(--panel)) transparent;
 }
+
+/* The approved Hermes portrait is shared across the three HQ surfaces. */
+.mvp-welcome-portrait {
+  width: clamp(5rem, 18dvh, 9rem);
+  height: clamp(5rem, 18dvh, 9rem);
+  object-fit: contain;
+  margin-bottom: .55rem;
+  border: 1px solid color-mix(in srgb, var(--hq-gold) 50%, transparent);
+  border-radius: 1rem;
+  background: radial-gradient(ellipse at 50% 32%, #49321d, #191617 73%);
+}
+.mvp-chat-identity {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: .3rem;
+  margin-inline-end: .45rem;
+  color: var(--hq-gold);
+  font-weight: 600;
+  pointer-events: none;
+}
+.welcome-active .mvp-chat-identity { display: none; }
+.mvp-chat-identity::before,
+#chat-history .msg-ai:not(.msg-group):not(.msg-continuation) .role::after {
+  content: '';
+  flex: none;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid #987343;
+  border-radius: 50%;
+  background: #2a2119 url('/static/icons/maven-portrait.png') center 14% / 142% auto no-repeat;
+}
+#chat-history .msg-ai:not(.msg-group):not(.msg-continuation) .role::after {
+  order: -1;
+  width: 1.6rem;
+  height: 1.6rem;
+}
+@media (max-height: 650px) {
+  .mvp-welcome-portrait { width: clamp(3rem, 15dvh, 6rem); height: clamp(3rem, 15dvh, 6rem); }
+}
+@media (max-width: 480px) {
+  .mvp-chat-identity { margin-inline-end: .22rem; }
+  .mvp-chat-identity::before { width: 1.15rem; height: 1.15rem; }
+}
+
+@media (min-height: 651px) and (min-width: 769px) { #welcome-screen { top: 37%; } }
